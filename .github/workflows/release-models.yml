@@ -1,0 +1,32 @@
+name: Release Models
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'trained_models/*.pkl'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete existing latest release
+        run: |
+          gh release delete latest --yes 2>/dev/null || true
+          git push --delete origin latest 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release with models
+        run: |
+          gh release create latest \
+            --title "Trained Models (latest)" \
+            --notes "Auto-updated trained ensemble models" \
+            trained_models/*.pkl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

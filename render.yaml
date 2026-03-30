@@ -2,9 +2,9 @@ services:
   - type: web
     name: options-intelligence-api
     env: python
-    region: singapore   # closest to India
-    plan: starter       # $7/month — has persistent disk
-    buildCommand: pip install -r requirements_deploy.txt
+    region: singapore
+    plan: free              # FREE tier — no disk needed
+    buildCommand: bash build_render.sh
     startCommand: uvicorn render_server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: RENDER
@@ -12,20 +12,20 @@ services:
       - key: NUBRA_ENV
         value: production
       - key: NUBRA_PHONE
-        sync: false   # set in Render dashboard
+        sync: false
       - key: MPIN
-        sync: false   # set in Render dashboard
+        sync: false
       - key: PHONE_NO
         sync: false
+      - key: NUBRA_TOTP_SECRET
+        sync: false
       - key: DB_PATH
-        value: /data/data.db
+        value: /tmp/data.db       # tmp — resets on restart, reloaded from API
       - key: MODELS_DIR
-        value: /data/trained_models
+        value: /tmp/trained_models
       - key: OMP_NUM_THREADS
         value: "1"
       - key: NETLIFY_URL
-        sync: false   # set to your Netlify URL
-    disk:
-      name: options-data
-      mountPath: /data
-      sizeGB: 1
+        sync: false
+      - key: GITHUB_REPO
+        sync: false               # e.g. shubhamsw2005/options-intelligence

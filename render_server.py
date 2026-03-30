@@ -227,8 +227,32 @@ async def lifespan(_app: FastAPI):
 
         threading.Thread(target=_run_ws, daemon=True).start()
 
-        # Background scheduler
+        # Background scheduler (data collection + daily retrain)
         threading.Thread(target=_background_scheduler, daemon=True).start()
+
+        # On free tier: fetch historical data on startup if DB is empty
+        def _initial_load():
+            time.sleep(5)  # let server fully start first
+            try:
+                from collect_data import init_db, collect_historical
+
+                conn = init_db(DB_PATH)
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM historical_candle"
+                ).fetchone()[0]
+                if count < 10:
+                    logger.info("[startup] DB empty — fetching historical data...")
+                    collect_historical(state["market_data"], conn)
+                    logger.info("[startup] Historical data loaded")
+                else:
+                    logger.info(
+                        f"[startup] DB has {count} candles — skipping initial load"
+                    )
+                conn.close()
+            except Exception as e:
+                logger.error(f"[startup] Initial load error: {e}")
+
+        threading.Thread(target=_initial_load, daemon=True).start()
 
         logger.info("[server] Ready")
     except Exception as e:
