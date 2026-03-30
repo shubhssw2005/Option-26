@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 from models.ensemble import OptionEnsemble
 
 load_dotenv()
-DB_PATH = os.getenv("DB_PATH", "data.db")
-MODELS_DIR = os.getenv("MODELS_DIR", "trained_models")
+def _db(): return os.getenv("DB_PATH", "data.db")
+def _models_dir(): return os.getenv("MODELS_DIR", "trained_models")
 
 ASSETS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX", "BANKEX"]
 EXCHANGE_MAP = {"SENSEX": "BSE", "BANKEX": "BSE"}
@@ -39,7 +39,7 @@ _model_cache: dict[str, OptionEnsemble] = {}
 
 def load_model(asset: str) -> OptionEnsemble:
     if asset not in _model_cache:
-        path = os.path.join(MODELS_DIR, f"{asset.lower()}_ensemble.pkl")
+        path = os.path.join(_models_dir(), f"{asset.lower()}_ensemble.pkl")
         if not os.path.exists(path):
             raise FileNotFoundError(
                 f"No model for {asset}. Run: python build_model.py {asset}"
@@ -50,7 +50,7 @@ def load_model(asset: str) -> OptionEnsemble:
 
 def _load_spot(asset: str) -> pd.Series:
     exchange = EXCHANGE_MAP.get(asset, "NSE")
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_db())
     df = pd.read_sql_query(
         "SELECT ts, close FROM historical_candle "
         "WHERE symbol=? AND exchange=? AND interval='1d' ORDER BY ts",
@@ -81,7 +81,7 @@ def _parse_expiry(symbol: str) -> pd.Timestamp | None:
 
 
 def load_latest_chain(asset: str, option_type: str = "CE") -> pd.DataFrame:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_db())
     df = pd.read_sql_query(
         """
         SELECT * FROM option_chain_snapshot

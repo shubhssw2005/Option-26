@@ -30,14 +30,19 @@ logger = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 IS_RENDER = os.getenv("RENDER", "") == "true"
-# Always use /tmp on Render (free tier has no persistent disk)
-DB_PATH    = os.getenv("DB_PATH",    "/tmp/data.db"        if IS_RENDER else "data.db")
-MODELS_DIR = os.getenv("MODELS_DIR", "/tmp/trained_models" if IS_RENDER else "trained_models")
-# Fallback: if configured path is empty/missing, use /tmp
-if IS_RENDER:
-    _models_exist = os.path.exists(MODELS_DIR) and bool(os.listdir(MODELS_DIR)) if os.path.exists(MODELS_DIR) else False
-    if not _models_exist:
-        MODELS_DIR = "/tmp/trained_models"
+
+def _safe_path(env_key, tmp_path, local_path):
+    """Get path, but never use /data (no disk on free tier)."""
+    val = os.getenv(env_key, "")
+    if IS_RENDER:
+        # Reject /data paths (old disk config) and empty values
+        if not val or val.startswith("/data"):
+            return tmp_path
+        return val
+    return val or local_path
+
+DB_PATH    = _safe_path("DB_PATH",    "/tmp/data.db",        "data.db")
+MODELS_DIR = _safe_path("MODELS_DIR", "/tmp/trained_models", "trained_models")
 NETLIFY_URL = os.getenv("NETLIFY_URL", "*")
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -376,10 +381,40 @@ def vol_forecast(
             logger.warning(f"vol-forecast live fetch failed: {e}")
 
     if len(df) < 30:
-        raise HTTPException(
-            404,
-            f"Not enough data for {symbol} ({len(df)} candles). Loading in background...",
-        )
+        # DB empty — compute vol from live Nubra data directly
+        if state["market_data"]:
+            try:
+                from datetime import datetime, timedelta, timezone
+                import pandas as pd
+                end_dt   = datetime.now(timezone.utc)
+                start_dt = end_dt - timedelta(days=90)
+                hist = state["market_data"].historical_data({
+                    "exchange": exchange, "type": "INDEX", "values": [symbol],
+                    "fields": ["close"], "interval": interval,
+                    "startDate": start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                    "endDate":   end_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                    "intraDay": False, "realTime": False,
+                })
+                sym_data = hist.result[0].values[0].get(symbol)
+                if sym_data and sym_data.close:
+                    df = pd.DataFrame([
+                        {"ts": p.timestamp, "close": (p.value or 0) / 100}
+                        for p in sym_data.close
+                    ])
+                    # Save to DB for future use
+                    try:
+                        from collect_data import init_db, save_index_candles
+                        conn = init_db(DB_PATH)
+                        save_index_candles(conn, hist, symbol, exchange, interval)
+                        conn.close()
+                    except Exception:
+                        pass
+                    logger.info(f"vol-forecast: fetched {len(df)} candles live for {symbol}")
+            except Exception as e:
+                logger.warning(f"vol-forecast live fetch: {e}")
+
+        if len(df) < 30:
+            raise HTTPException(404, f"No data for {symbol}. Server is loading data...")
 
     try:
         return forecast_asset(symbol)

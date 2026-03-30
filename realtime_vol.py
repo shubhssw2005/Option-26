@@ -20,14 +20,18 @@ from models.vol_models import (
 )
 
 load_dotenv()
-DB_PATH = os.getenv("DB_PATH", "data.db")
 EXCHANGE_MAP = {"SENSEX": "BSE", "BANKEX": "BSE"}
 ASSETS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX", "BANKEX"]
 
 
+def _db_path() -> str:
+    """Get DB_PATH at call time (not import time) so Render env var is respected."""
+    return os.getenv("DB_PATH", "data.db")
+
+
 def load_spot(asset: str) -> pd.Series:
     exchange = EXCHANGE_MAP.get(asset, "NSE")
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_db_path())
     df = pd.read_sql_query(
         "SELECT ts, close FROM historical_candle "
         "WHERE symbol=? AND exchange=? AND interval='1d' ORDER BY ts",
@@ -41,7 +45,7 @@ def load_spot(asset: str) -> pd.Series:
 
 def iv_percentile(asset: str, window: int = 252) -> float:
     """Rolling IV percentile from historical_option data."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_db_path())
     df = pd.read_sql_query(
         "SELECT ts, AVG(iv) as avg_iv FROM historical_option "
         "WHERE asset=? AND iv IS NOT NULL AND iv > 0 "
@@ -61,7 +65,7 @@ def iv_percentile(asset: str, window: int = 252) -> float:
 
 def pcr(asset: str) -> float:
     """Put-Call Ratio from latest option chain snapshot."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_db_path())
     df = pd.read_sql_query(
         """
         SELECT option_type, SUM(oi) as total_oi
@@ -98,7 +102,7 @@ def forecast_asset(asset: str) -> dict:
 
     # Vol risk premium = IV - Realized vol
     current_iv = None
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_db_path())
     row = conn.execute(
         "SELECT AVG(iv)*100 FROM historical_option WHERE asset=? AND iv>0 "
         "ORDER BY ts DESC LIMIT 50",
