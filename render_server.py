@@ -29,11 +29,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
-IS_RENDER = os.getenv("RENDER", "") == "true"
-DB_PATH = os.getenv("DB_PATH", "/data/data.db" if IS_RENDER else "data.db")
-MODELS_DIR = os.getenv(
-    "MODELS_DIR", "/data/trained_models" if IS_RENDER else "trained_models"
-)
+IS_RENDER  = os.getenv("RENDER", "") == "true"
+# Always use /tmp on Render (free tier has no persistent disk)
+DB_PATH    = os.getenv("DB_PATH",    "/tmp/data.db"        if IS_RENDER else "data.db")
+MODELS_DIR = os.getenv("MODELS_DIR", "/tmp/trained_models" if IS_RENDER else "trained_models")
 NETLIFY_URL = os.getenv("NETLIFY_URL", "*")
 IST = pytz.timezone("Asia/Kolkata")
 
