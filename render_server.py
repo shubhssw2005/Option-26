@@ -332,14 +332,38 @@ def vol_forecast(
         "SELECT ts, close FROM historical_candle WHERE symbol=? AND exchange=? AND interval=? ORDER BY ts",
         (symbol, exchange, interval),
     )
+
+    # If DB empty, fetch live from Nubra API
+    if len(df) < 30 and state["market_data"]:
+        try:
+            from datetime import datetime, timedelta, timezone
+            import pandas as pd
+            end_dt   = datetime.now(timezone.utc)
+            start_dt = end_dt - timedelta(days=90)
+            hist = state["market_data"].historical_data({
+                "exchange": exchange, "type": "INDEX", "values": [symbol],
+                "fields": ["close"], "interval": interval,
+                "startDate": start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                "endDate":   end_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                "intraDay": False, "realTime": False,
+            })
+            sym_data = hist.result[0].values[0].get(symbol)
+            if sym_data and sym_data.close:
+                df = pd.DataFrame([
+                    {"ts": p.timestamp, "close": (p.value or 0) / 100}
+                    for p in sym_data.close
+                ])
+                logger.info(f"vol-forecast: fetched {len(df)} candles live for {symbol}")
+        except Exception as e:
+            logger.warning(f"vol-forecast live fetch failed: {e}")
+
     if len(df) < 30:
-        raise HTTPException(404, "Not enough data")
+        raise HTTPException(404, f"Not enough data for {symbol} ({len(df)} candles). Loading in background...")
+
     try:
-        result = forecast_asset(symbol)
-        return result
+        return forecast_asset(symbol)
     except Exception as e:
         raise HTTPException(500, str(e)) from e
-
 
 @app.get("/vol-forecast-all")
 def vol_forecast_all():
@@ -347,7 +371,8 @@ def vol_forecast_all():
 
 
 @app.get("/strategy-recommend")
-def strategy_recommend(
+@app.get("/strategy/recommend")
+def strategy_recommend_endpoint(
     asset: str = Query("NIFTY"),
     dte: int = Query(7),
     spot_change: float = Query(None),
@@ -355,39 +380,114 @@ def strategy_recommend(
     iv_rank: float = Query(None),
     risk_tolerance: str = Query("medium"),
 ):
+    """Strategy recommendation — direct implementation, no vol_server import."""
     try:
-        from vol_server import strategy_recommend_endpoint
+        from models.strategy_engine import score_strategies, classify_regime, liquidity_score
 
-        return strategy_recommend_endpoint(
-            asset=asset,
-            dte=dte,
-            spot_change=spot_change,
-            iv_level=iv_level,
-            iv_rank=iv_rank,
-            risk_tolerance=risk_tolerance,
+        # Get spot data
+        df_spot = query_df(
+            "SELECT close FROM historical_candle WHERE symbol=? AND exchange=? AND interval='1d' ORDER BY ts DESC LIMIT 25",
+            (asset, "BSE" if asset in ("SENSEX","BANKEX") else "NSE")
         )
-    except Exception as e:
-        raise HTTPException(500, str(e)) from e
+        spot_val = float(df_spot["close"].iloc[0]) if not df_spot.empty else 23300.0
 
+        if spot_change is None:
+            spot_change = float((df_spot["close"].iloc[0] - df_spot["close"].iloc[1]) / df_spot["close"].iloc[1] * 100) if len(df_spot) > 1 else 0.0
+        if iv_level is None:
+            iv_level = 25.0
+        if iv_rank is None:
+            iv_rank = 50.0
 
-@app.get("/strategy/recommend")
-def strategy_recommend_v2(asset: str = Query("NIFTY"), dte: int = Query(7)):
-    try:
-        from vol_server import strategy_recommend
+        # Signals
+        try:
+            sigs = generate_signals(asset)
+            ce_score = float(sigs.get("CE",[{}])[0].get("signal_score",0.5)) if sigs.get("CE") else 0.5
+            pe_score = float(sigs.get("PE",[{}])[0].get("signal_score",0.5)) if sigs.get("PE") else 0.5
+        except Exception:
+            ce_score, pe_score = 0.5, 0.5
 
-        return strategy_recommend(asset=asset, dte=dte)
+        # Regime
+        df_spot20 = query_df(
+            "SELECT close FROM historical_candle WHERE symbol=? AND exchange=? AND interval='1d' ORDER BY ts DESC LIMIT 25",
+            (asset, "BSE" if asset in ("SENSEX","BANKEX") else "NSE")
+        )
+        spot_ret5  = float((df_spot20["close"].iloc[0] - df_spot20["close"].iloc[4])  / df_spot20["close"].iloc[4]) if len(df_spot20) >= 5  else 0.0
+        spot_ret20 = float((df_spot20["close"].iloc[0] - df_spot20["close"].iloc[-1]) / df_spot20["close"].iloc[-1]) if len(df_spot20) >= 20 else 0.0
+
+        regime = classify_regime(
+            spot_ret_5=spot_ret5, spot_ret_20=spot_ret20,
+            realized_vol=25.0, iv_percentile=iv_rank,
+            pcr=1.0, garch_vol_1d=1.5,
+        )
+
+        # Chain liquidity
+        df_chain = query_df(
+            "SELECT option_type, strike/100.0 as strike, ltp/100.0 as ltp, iv, delta, gamma, theta, vega, oi, volume FROM option_chain_snapshot WHERE asset=? ORDER BY collected_at DESC, strike LIMIT 400",
+            (asset,)
+        )
+        liq = liquidity_score(df_chain) if not df_chain.empty else 0.5
+
+        ranked = score_strategies(
+            regime=regime, signal_score_ce=ce_score, signal_score_pe=pe_score,
+            atm_iv=iv_level, iv_percentile=iv_rank, pcr=1.0, dte=dte, liquidity_score=liq,
+        )
+
+        # Build condition_analysis for frontend compatibility
+        trend = "Strong Bearish" if spot_ret5 < -0.03 else "Bearish" if spot_ret5 < 0 else "Bullish" if spot_ret5 > 0.03 else "Neutral"
+        vol_env = "High Volatility" if iv_level > 30 else "Low Volatility" if iv_level < 15 else "Normal Volatility"
+        iv_status = "IV Rank High" if iv_rank > 70 else "IV Rank Low" if iv_rank < 30 else "IV Rank Neutral"
+
+        top = [{
+            "strategy_key": s["key"],
+            "name":         s["name"],
+            "category":     s["category"],
+            "description":  s["best_when"],
+            "best_for":     s["best_when"],
+            "risk_profile":  s["max_loss"],
+            "score":         s["score"] * 100,
+            "trend_fit":     s["direction"],
+            "rank":          i + 1,
+        } for i, s in enumerate(ranked[:10])]
+
+        return {
+            "asset":              asset,
+            "spot":               round(spot_val, 2),
+            "iv_level":           iv_level,
+            "iv_rank":            iv_rank,
+            "dte":                dte,
+            "spot_change_pct":    round(spot_change, 2),
+            "risk_tolerance":     risk_tolerance,
+            "regime":             regime["regime"],
+            "regime_description": f"{regime["regime"]} — {vol_env}",
+            "condition_analysis": {
+                "trend":                  trend,
+                "volatility_environment": vol_env,
+                "iv_status":              iv_status,
+                "skew_analysis":          "Normal Skew",
+                "overall_outlook":        f"{trend} market with {vol_env.lower()}. {"Sell premium" if iv_rank > 60 else "Buy options"} favoured.",
+            },
+            "top_recommendations": top,
+        }
     except Exception as e:
         raise HTTPException(500, str(e)) from e
 
 
 @app.get("/strategy-details/{strategy_key}")
 def strategy_details(strategy_key: str, asset: str = Query("NIFTY")):
-    try:
-        from vol_server import strategy_details_endpoint
-
-        return strategy_details_endpoint(strategy_key=strategy_key, asset=asset)
-    except Exception as e:
-        raise HTTPException(500, str(e)) from e
+    from models.strategy_engine import STRATEGY_CATALOG
+    s = STRATEGY_CATALOG.get(strategy_key)
+    if not s:
+        raise HTTPException(404, f"Unknown strategy: {strategy_key}")
+    return {
+        "strategy_key": strategy_key,
+        "name":         s.name,
+        "category":     s.category,
+        "description":  s.best_when,
+        "best_for":     s.best_when,
+        "risk_profile":  s.max_loss,
+        "max_profit":   s.max_profit,
+        "breakeven":    s.breakeven,
+    }
 
 
 @app.get("/signals")

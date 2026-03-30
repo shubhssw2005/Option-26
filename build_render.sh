@@ -6,10 +6,8 @@ echo "=== Installing dependencies ==="
 pip install -r requirements_deploy.txt
 
 echo "=== Installing Nubra SDK ==="
-# Install grpcio binary wheel first (avoid source compilation)
-pip install --only-binary=:all: grpcio grpcio-tools || \
-pip install grpcio grpcio-tools  # fallback if no binary available
-
+pip install --only-binary=:all: grpcio grpcio-tools 2>/dev/null || \
+pip install grpcio grpcio-tools
 pip install --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
             nubra-sdk
@@ -18,25 +16,14 @@ echo "=== Setting up directories ==="
 mkdir -p /tmp/trained_models
 mkdir -p /tmp/logs
 
-echo "=== Downloading pre-trained models from GitHub ==="
-REPO="${GITHUB_REPO:-shubhamsw2005/options-intelligence}"
-BASE="https://github.com/${REPO}/releases/latest/download"
-
-for model in nifty banknifty finnifty midcpnifty; do
-    FILE="${model}_ensemble.pkl"
-    echo "  Downloading ${FILE}..."
-    if curl -fsSL "${BASE}/${FILE}" -o "/tmp/trained_models/${FILE}" 2>/dev/null; then
-        SIZE=$(du -h "/tmp/trained_models/${FILE}" | cut -f1)
-        echo "  ✓ ${FILE} (${SIZE})"
-    else
-        echo "  ⚠ ${FILE} not found in releases — will train on startup if data available"
-        # Copy from repo if present (first deploy)
-        if [ -f "trained_models/${FILE}" ]; then
-            cp "trained_models/${FILE}" "/tmp/trained_models/${FILE}"
-            echo "  ✓ Copied from repo"
-        fi
-    fi
-done
+echo "=== Copying pre-trained models ==="
+# Models are committed to the repo — just copy them
+if [ -d "trained_models" ] && ls trained_models/*.pkl 1>/dev/null 2>&1; then
+    cp trained_models/*.pkl /tmp/trained_models/
+    echo "  ✓ Copied $(ls /tmp/trained_models/*.pkl | wc -l | tr -d ' ') models from repo"
+else
+    echo "  ⚠ No models in repo — will need to train after data collection"
+fi
 
 echo "=== Initialising database ==="
 python3 -c "
@@ -50,4 +37,5 @@ print('DB initialised at /tmp/data.db')
 "
 
 echo "=== Build complete ==="
-ls -lh /tmp/trained_models/ 2>/dev/null || echo "No models yet"
+echo "Models: $(ls /tmp/trained_models/*.pkl 2>/dev/null | wc -l | tr -d ' ')"
+ls -lh /tmp/trained_models/ 2>/dev/null || true
