@@ -3,7 +3,8 @@ services:
     name: options-intelligence-api
     env: python
     region: singapore
-    plan: free              # FREE tier — no disk needed
+    plan: free
+    pythonVersion: "3.11" # pin Python 3.11 — best compatibility
     buildCommand: bash build_render.sh
     startCommand: uvicorn render_server:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -20,7 +21,7 @@ services:
       - key: NUBRA_TOTP_SECRET
         sync: false
       - key: DB_PATH
-        value: /tmp/data.db       # tmp — resets on restart, reloaded from API
+        value: /tmp/data.db # tmp — resets on restart, reloaded from API
       - key: MODELS_DIR
         value: /tmp/trained_models
       - key: OMP_NUM_THREADS
@@ -28,4 +29,4 @@ services:
       - key: NETLIFY_URL
         sync: false
       - key: GITHUB_REPO
-        sync: false               # e.g. shubhamsw2005/options-intelligence
+        sync: false # e.g. shubhamsw2005/options-intelligence

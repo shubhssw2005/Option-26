@@ -19,9 +19,9 @@ pytz>=2024.1
 scipy>=1.10
 pyotp>=2.9
 
-# grpcio binary (required by nubra-sdk — pin to avoid source compilation)
-grpcio==1.62.0
-grpcio-tools==1.62.0
+# grpcio binary (required by nubra-sdk — use latest with Python 3.14 wheels)
+# Do NOT pin version — let pip find the right binary wheel
+# grpcio and grpcio-tools installed via build_render.sh with --only-binary
 
 # Nubra SDK
 # Install separately:

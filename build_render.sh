@@ -6,9 +6,9 @@ echo "=== Installing dependencies ==="
 pip install -r requirements_deploy.txt
 
 echo "=== Installing Nubra SDK ==="
-# Pin grpcio to avoid source compilation on Render
-pip install grpcio==1.62.0 grpcio-tools==1.62.0 --only-binary=:all: 2>/dev/null || \
-pip install grpcio grpcio-tools --only-binary=:all:
+# Install grpcio binary wheel first (avoid source compilation)
+pip install --only-binary=:all: grpcio grpcio-tools || \
+pip install grpcio grpcio-tools  # fallback if no binary available
 
 pip install --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
