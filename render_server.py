@@ -31,10 +31,13 @@ logger = logging.getLogger(__name__)
 # ── Config ────────────────────────────────────────────────────────────────────
 IS_RENDER = os.getenv("RENDER", "") == "true"
 # Always use /tmp on Render (free tier has no persistent disk)
-DB_PATH = os.getenv("DB_PATH", "/tmp/data.db" if IS_RENDER else "data.db")
-MODELS_DIR = os.getenv(
-    "MODELS_DIR", "/tmp/trained_models" if IS_RENDER else "trained_models"
-)
+DB_PATH    = os.getenv("DB_PATH",    "/tmp/data.db"        if IS_RENDER else "data.db")
+MODELS_DIR = os.getenv("MODELS_DIR", "/tmp/trained_models" if IS_RENDER else "trained_models")
+# Fallback: if configured path is empty/missing, use /tmp
+if IS_RENDER:
+    _models_exist = os.path.exists(MODELS_DIR) and bool(os.listdir(MODELS_DIR)) if os.path.exists(MODELS_DIR) else False
+    if not _models_exist:
+        MODELS_DIR = "/tmp/trained_models"
 NETLIFY_URL = os.getenv("NETLIFY_URL", "*")
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -308,14 +311,19 @@ async def root():
 @app.get("/health")
 def health():
     now = datetime.now(IST)
-    t = now.strftime("%H:%M")
     mkt = market_status()
+    import glob
+
+    models = glob.glob(os.path.join(MODELS_DIR, "*.pkl"))
     return {
         "status": "ok",
         "ws_connected": state["ws_connected"],
         "authenticated": state["nubra"] is not None,
         "market_status": mkt,
         "ist_time": now.strftime("%H:%M:%S IST"),
+        "models_dir": MODELS_DIR,
+        "models_loaded": [os.path.basename(m) for m in models],
+        "db_path": DB_PATH,
         "note": (
             "Market open — live streaming"
             if mkt == "open"
@@ -620,50 +628,55 @@ def historical(
         raise HTTPException(503, "SDK not ready — authentication in progress")
     if end is None:
         end = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    def _do_fetch():
+        return md.historical_data({
+            "exchange": exchange, "type": itype, "values": [symbol],
+            "fields": fields.split(","), "startDate": start, "endDate": end,
+            "interval": interval, "intraDay": False, "realTime": False,
+        })
+
     try:
-        resp = md.historical_data(
-            {
-                "exchange": exchange,
-                "type": itype,
-                "values": [symbol],
-                "fields": fields.split(","),
-                "startDate": start,
-                "endDate": end,
-                "interval": interval,
-                "intraDay": False,
-                "realTime": False,
-            }
-        )
-        # Convert SDK response to JSON-serializable format
+        resp = _do_fetch()
+    except Exception as e:
+        if "403" in str(e):
+            logger.warning("[historical] 403 token expired — refreshing...")
+            try:
+                state["nubra"].auth_flow()
+                resp = _do_fetch()
+            except Exception as e2:
+                raise HTTPException(500, str(e2)) from e2
+        else:
+            raise HTTPException(500, str(e)) from e
+
+    # Convert SDK response to JSON-serializable format
+    try:
         result = []
-        for chart_data in resp.result or []:
+        for chart_data in (resp.result or []):
             values_list = []
-            for sym_dict in chart_data.values or []:
+            for sym_dict in (chart_data.values or []):
                 sym_entry = {}
                 for sym_name, stock_chart in sym_dict.items():
                     sym_entry[sym_name] = {}
                     for field in fields.split(","):
                         pts = getattr(stock_chart, field, None) or []
                         sym_entry[sym_name][field] = [
-                            {"timestamp": p.timestamp, "value": p.value} for p in pts
+                            {"timestamp": p.timestamp, "value": p.value}
+                            for p in pts
                         ]
                 values_list.append(sym_entry)
-            result.append(
-                {
-                    "exchange": chart_data.exchange,
-                    "type": chart_data.type,
-                    "values": values_list,
-                }
-            )
+            result.append({
+                "exchange": chart_data.exchange,
+                "type":     chart_data.type,
+                "values":   values_list,
+            })
         return {
             "market_time": str(resp.market_time) if resp.market_time else None,
-            "message": resp.message,
-            "result": result,
+            "message":     resp.message,
+            "result":      result,
         }
     except Exception as e:
-        logger.error(f"historical error: {e}")
+        logger.error(f"historical serialization error: {e}")
         raise HTTPException(500, str(e)) from e
-
 
 @app.get("/iv-surface")
 def iv_surface_endpoint(asset: str = Query("NIFTY")):
