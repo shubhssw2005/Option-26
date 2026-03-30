@@ -195,78 +195,75 @@ def _on_error(err):
 # ── App lifecycle ─────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Server ALWAYS starts — auth failure is non-fatal
     try:
-        from nubra_python_sdk.start_sdk import InitNubraSdk, NubraEnv
         from nubra_python_sdk.marketdata.market_data import MarketData
         from nubra_python_sdk.ticker.websocketdata import NubraDataSocket
-        from auto_auth import get_authenticated_client
+        from auto_auth import get_authenticated_client, _token_cache
 
         logger.info("[server] Authenticating...")
-        nubra = get_authenticated_client()
-        state["nubra"] = nubra
-        state["market_data"] = MarketData(nubra)
+        nubra = get_authenticated_client(state)
+        if nubra:
+            state["nubra"] = nubra
+            state["market_data"] = MarketData(nubra)
+            logger.info("[server] Auth OK")
 
-        # WebSocket
-        socket = NubraDataSocket(
-            client=nubra,
-            on_index_data=_on_index,
-            on_greeks_data=_on_greeks,
-            on_connect=_on_connect,
-            on_close=_on_close,
-            on_error=_on_error,
-            reconnect=True,
-            persist_subscriptions=True,
-        )
-        state["socket"] = socket
-
-        def _run_ws():
-            socket.connect()
-            time.sleep(2)
-            socket.subscribe(
-                ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"],
-                data_type="index",
-                exchange="NSE",
+            # WebSocket
+            socket = NubraDataSocket(
+                client=nubra,
+                on_index_data=_on_index,
+                on_greeks_data=_on_greeks,
+                on_connect=_on_connect,
+                on_close=_on_close,
+                on_error=_on_error,
+                reconnect=True,
+                persist_subscriptions=True,
             )
-            socket.keep_running()
+            state["socket"] = socket
 
-        threading.Thread(target=_run_ws, daemon=True).start()
-
-        # Background scheduler (data collection + daily retrain)
-        threading.Thread(target=_background_scheduler, daemon=True).start()
-
-        # On free tier: fetch historical data on startup if DB is empty
-        def _initial_load():
-            time.sleep(5)  # let server fully start first
-            try:
-                from collect_data import init_db, collect_historical
-
-                conn = init_db(DB_PATH)
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM historical_candle"
-                ).fetchone()[0]
-                if count < 10:
-                    logger.info("[startup] DB empty — fetching historical data...")
-                    collect_historical(state["market_data"], conn)
-                    logger.info("[startup] Historical data loaded")
-                else:
-                    logger.info(
-                        f"[startup] DB has {count} candles — skipping initial load"
+            def _run_ws():
+                try:
+                    socket.connect()
+                    time.sleep(2)
+                    socket.subscribe(
+                        ["NIFTY","BANKNIFTY","FINNIFTY","MIDCPNIFTY"],
+                        data_type="index", exchange="NSE",
                     )
-                conn.close()
-            except Exception as e:
-                logger.error(f"[startup] Initial load error: {e}")
+                    socket.keep_running()
+                except Exception as e:
+                    logger.error(f"[ws] Error: {e}")
 
-        threading.Thread(target=_initial_load, daemon=True).start()
+            threading.Thread(target=_run_ws, daemon=True).start()
+            threading.Thread(target=_background_scheduler, daemon=True).start()
 
-        logger.info("[server] Ready")
+            def _initial_load():
+                time.sleep(5)
+                try:
+                    from collect_data import init_db, collect_historical
+                    conn = init_db(DB_PATH)
+                    count = conn.execute("SELECT COUNT(*) FROM historical_candle").fetchone()[0]
+                    if count < 10:
+                        logger.info("[startup] DB empty — fetching historical data...")
+                        collect_historical(state["market_data"], conn)
+                        logger.info("[startup] Historical data loaded")
+                    conn.close()
+                except Exception as e:
+                    logger.error(f"[startup] Initial load error: {e}")
+
+            threading.Thread(target=_initial_load, daemon=True).start()
+        else:
+            logger.warning("[server] Auth failed — starting without Nubra connection")
+            logger.warning("[server] Set NUBRA_SESSION_TOKEN env var on Render")
+
     except Exception as e:
-        logger.error(f"[server] Startup error: {e}")
+        logger.error(f"[server] Startup error: {e} — server starting anyway")
+
+    logger.info("[server] Ready")
     yield
     if state.get("socket"):
-        try:
-            state["socket"].disconnect()
-        except Exception:
-            pass
+        try: state["socket"].disconnect()
+        except Exception: pass
+
 
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
