@@ -1,21 +1,36 @@
 """
-auto_auth.py — Fully automatic Nubra authentication.
+auto_auth.py — Nubra authentication for Render deployment.
 
-If NUBRA_TOTP_SECRET is set → generates TOTP and monkey-patches input()
-so the SDK never blocks waiting for user input.
+On Render: uses NUBRA_SESSION_TOKEN (pre-generated locally, set as env var).
+Locally: interactive OTP as usual.
+
+To generate a fresh token locally:
+    python auto_auth.py token
 """
 
 import os
 import time
 import logging
+import shelve
 
 logger = logging.getLogger(__name__)
 
 
-def generate_totp(secret: str) -> str:
-    import pyotp
+def get_current_token() -> str:
+    """Get session token from local shelve cache."""
+    try:
+        with shelve.open("auth_data.db", flag="r") as db:
+            return db.get("session_token", "")
+    except Exception:
+        return ""
 
-    return pyotp.TOTP(secret).now()
+
+def get_device_id() -> str:
+    try:
+        with shelve.open("auth_data.db", flag="r") as db:
+            return db.get("x-device-id", "TS123")
+    except Exception:
+        return "TS123"
 
 
 def get_authenticated_client():
@@ -27,58 +42,67 @@ def get_authenticated_client():
 
     env_str = os.getenv("NUBRA_ENV", "uat").lower()
     env = NubraEnv.PROD if env_str == "production" else NubraEnv.UAT
-    secret = os.getenv("NUBRA_TOTP_SECRET", "")
-    mpin = os.getenv("MPIN") or os.getenv("NUBRA_MPIN", "")
 
-    if secret:
-        logger.info("[auth] TOTP auto-login — patching input()")
+    # On Render: use pre-set session token
+    pretoken = os.getenv("NUBRA_SESSION_TOKEN", "")
+    if pretoken:
+        logger.info("[auth] Using NUBRA_SESSION_TOKEN from env")
+        return _client_from_token(env, pretoken)
 
-        # Pre-generate answers for all interactive prompts the SDK may ask
-        # Order: TOTP code, then MPIN (if asked again)
-        answers = []
+    # Local: normal interactive login
+    logger.info("[auth] Interactive OTP login")
+    nubra = InitNubraSdk(env, env_creds=True)
+    return nubra
 
-        def _auto_input(prompt=""):
-            """Replace input() with automatic responses."""
-            prompt_lower = str(prompt).lower()
-            logger.info(f"[auth] SDK prompt: {prompt!r}")
 
-            if "totp" in prompt_lower or "otp" in prompt_lower:
-                code = generate_totp(secret)
-                logger.info(f"[auth] Auto-answering TOTP: {code}")
-                return code
-            elif "mpin" in prompt_lower or "pin" in prompt_lower:
-                logger.info("[auth] Auto-answering MPIN")
-                return mpin
-            elif "phone" in prompt_lower:
-                phone = os.getenv("PHONE_NO") or os.getenv("NUBRA_PHONE", "")
-                logger.info(f"[auth] Auto-answering phone: {phone}")
-                return phone
-            else:
-                logger.warning(f"[auth] Unknown prompt: {prompt!r} — returning empty")
-                return ""
+def _client_from_token(env, token: str):
+    """
+    Create an InitNubraSdk-like object with a pre-existing session token.
+    Bypasses all login flows.
+    """
+    from nubra_python_sdk.start_sdk import InitNubraSdk, NubraEnv
 
-        # Patch builtins.input globally
-        import builtins
+    # Create instance without calling __init__
+    nubra = object.__new__(InitNubraSdk)
 
-        original_input = builtins.input
-        builtins.input = _auto_input
+    # Set required attributes that MarketData reads
+    nubra.env = env
+    nubra.totp_login = False
+    nubra.db_path = "auth_data.db"
+    nubra.env_path_login = False
+    nubra.token_data = {
+        "session_token": token,
+        "auth_token": token,
+        "x-device-id": get_device_id(),
+    }
+    nubra.API_BASE_URL = "https://api.nubra.io"
 
-        try:
-            for attempt in range(3):
-                try:
-                    # Regenerate TOTP fresh for each attempt
-                    nubra = InitNubraSdk(env, totp_login=True, env_creds=True)
-                    logger.info("[auth] TOTP login successful")
-                    return nubra
-                except Exception as e:
-                    logger.warning(f"[auth] Attempt {attempt+1} failed: {e}")
-                    if attempt < 2:
-                        logger.info("[auth] Waiting 31s for next TOTP window...")
-                        time.sleep(31)
-            raise RuntimeError("TOTP login failed after 3 attempts")
-        finally:
-            builtins.input = original_input  # always restore
+    # Minimal methods needed by MarketData
+    def _get_token():
+        return token
 
+    def _auth_flow():
+        logger.info("[auth] auth_flow called — token already set")
+
+    nubra.get_token = _get_token
+    nubra.auth_flow = _auth_flow
+    nubra.BEARER_TOKEN = token
+
+    logger.info("[auth] Client created from pre-set token")
+    return nubra
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "token":
+        # Print current token for use as Render env var
+        token = get_current_token()
+        if token:
+            print(f"\nAdd this to Render environment variables:")
+            print(f"NUBRA_SESSION_TOKEN = {token}")
+            print(f"\nToken expires in ~8 hours. Re-run to refresh.")
+        else:
+            print("No token found. Run the server locally first to authenticate.")
     else:
-        logger.info("[auth] No TOTP secret — interactive OTP login")
-        return InitNubraSdk(env, env_creds=True)
+        print("Usage: python auto_auth.py token")
