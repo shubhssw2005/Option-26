@@ -959,7 +959,7 @@
         'use strict';
         const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:8000'
-  : (window.RENDER_API_URL || 'https://options-intelligence-api.onrender.com');
+  : 'https://option-26.onrender.com';
         let charts = {}, refreshTimers = {}, lastData = {};
 
         // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -1592,7 +1592,15 @@
             }, 60000);
         }
 
-        // ── Init ──────────────────────────────────────────────────────────────────────
+        
+// ── Aliases (HTML buttons use fetch* names, JS defines load* names) ──────────
+const fetchVol       = loadVol;
+const fetchStrategy  = loadStrategy;
+const fetchSignals   = loadSignals;
+const fetchGreeks    = loadGreeks;
+const fetchHistorical = loadHistory;
+
+// ── Init ──────────────────────────────────────────────────────────────────────
         connectWS();
         loadDashboard();
         startAutoRefresh();

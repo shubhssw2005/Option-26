@@ -269,7 +269,14 @@ app = FastAPI(title="Options Intelligence API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[NETLIFY_URL, "http://localhost:3000", "http://localhost:8000", "*"],
+    allow_origins=[
+        "https://option-26.onrender.com",
+        "https://option-26.netlify.app",
+        NETLIFY_URL,
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "*",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
