@@ -1,0 +1,28 @@
+# Core
+fastapi>=0.111
+uvicorn[standard]>=0.29
+python-dotenv>=1.0
+requests>=2.31
+websockets>=12
+
+# Data
+pandas>=2.0
+numpy<2
+
+# ML / Tree models
+catboost>=1.2
+xgboost>=2.0
+lightgbm>=4.0
+scikit-learn>=1.4
+
+# Deep learning (install separately — needs Python 3.11)
+# pip install torch torchvision torchaudio
+# torch>=2.2
+
+# Volatility / Time series
+arch>=6.3
+pmdarima>=2.0
+statsmodels>=0.14
+
+# Nubra SDK
+# pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple nubra-sdk

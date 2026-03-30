@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Options Intelligence Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --bg: #f8f8f8;
+            --surface: #fff;
+            --border: #e0e0e0;
+            --border2: #111;
+            --text: #111;
+            --muted: #666;
+            --green: #1a7a3c;
+            --red: #c0392b;
+            --blue: #1a3a6b;
+            --gold: #b8860b;
+            --accent: #111;
+            --font: 'Inter', system-ui, sans-serif;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.5
+        }
+
+        /* ── Layout ── */
+        .shell {
+            display: grid;
+            grid-template-rows: 48px 1fr;
+            height: 100vh;
+            overflow: hidden
+        }
+
+        header {
+            background: #111;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 0 20px;
+            border-bottom: 2px solid #333
+        }
+
+        header h1 {
+            font-size: .85rem;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase
+        }
+
+        .hbadge {
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-size: .65rem;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            border: 1px solid #555;
+            color: #ccc
+        }
+
+        .hbadge.live {
+            background: #1a7a3c;
+            border-color: #1a7a3c;
+            color: #fff
+        }
+
+        #hstatus {
+            font-size: .7rem;
+            color: #888;
+            margin-left: auto
+        }
+
+        .htime {
+            font-size: .7rem;
+            color: #aaa;
+            font-variant-numeric: tabular-nums
+        }
+
+        .body {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            overflow: hidden
+        }
+
+        nav {
+            background: #fff;
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 12px 0
+        }
+
+        .nav-section {
+            padding: 4px 16px 2px;
+            font-size: .62rem;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: #999;
+            margin-top: 8px
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 16px;
+            cursor: pointer;
+            font-size: .78rem;
+            color: #444;
+            border-left: 3px solid transparent;
+            transition: all .15s
+        }
+
+        .nav-item:hover {
+            background: #f5f5f5;
+            color: #111
+        }
+
+        .nav-item.active {
+            background: #f0f0f0;
+            color: #111;
+            border-left-color: #111;
+            font-weight: 600
+        }
+
+        .nav-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ccc;
+            flex-shrink: 0
+        }
+
+        .nav-dot.green {
+            background: var(--green)
+        }
+
+        .nav-dot.red {
+            background: var(--red)
+        }
+
+        main {
+            overflow-y: auto;
+            padding: 20px
+        }
+
+        .page {
+            display: none
+        }
+
+        .page.active {
+            display: block
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 16px;
+            margin-bottom: 16px
+        }
+
+        .card-title {
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: #555;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px
+        }
+
+        .grid3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px
+        }
+
+        .grid4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px
+        }
+
+        /* ── KPI tiles ── */
+        .kpi {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 12px 14px
+        }
+
+        .kpi-label {
+            font-size: .65rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: .08em
+        }
+
+        .kpi-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 2px 0;
+            font-variant-numeric: tabular-nums
+        }
+
+        .kpi-sub {
+            font-size: .7rem;
+            color: #888
+        }
+
+        .up {
+            color: var(--green)
+        }
+
+        .down {
+            color: var(--red)
+        }
+
+        .neutral {
+            color: #555
+        }
+
+        /* ── Tables ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .76rem
+        }
+
+        th {
+            text-align: left;
+            padding: 5px 8px;
+            font-size: .63rem;
+            font-weight: 700;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+            color: #666;
+            border-bottom: 2px solid #111;
+            white-space: nowrap
+        }
+
+        td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            font-variant-numeric: tabular-nums
+        }
+
+        tr:hover td {
+            background: #fafafa
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-size: .62rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase
+        }
+
+        .tag-green {
+            background: #e8f5e9;
+            color: var(--green);
+            border: 1px solid #c8e6c9
+        }
+
+        .tag-red {
+            background: #fce4e4;
+            color: var(--red);
+            border: 1px solid #f5c6c6
+        }
+
+        .tag-blue {
+            background: #e3eaf5;
+            color: var(--blue);
+            border: 1px solid #c5d3e8
+        }
+
+        .tag-gold {
+            background: #fdf6e3;
+            color: var(--gold);
+            border: 1px solid #f0e0a0
+        }
+
+        .tag-grey {
+            background: #f5f5f5;
+            color: #555;
+            border: 1px solid #ddd
+        }
+
+        /* ── Controls ── */
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 14px
+        }
+
+        select,
+        input {
+            background: #fff;
+            border: 1px solid #ccc;
+            color: #111;
+            padding: 5px 10px;
+            border-radius: 2px;
+            font-size: .78rem;
+            outline: none;
+            font-family: inherit
+        }
+
+        select:focus,
+        input:focus {
+            border-color: #111
+        }
+
+        button {
+            background: #111;
+            border: none;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: .75rem;
+            font-weight: 600;
+            letter-spacing: .04em;
+            font-family: inherit
+        }
+
+        button:hover {
+            background: #333
+        }
+
+        button.outline {
+            background: #fff;
+            color: #111;
+            border: 1px solid #111
+        }
+
+        button.outline:hover {
+            background: #f5f5f5
+        }
+
+        button.green-btn {
+            background: var(--green)
+        }
+
+        button.red-btn {
+            background: var(--red)
+        }
+
+        /* ── Strategy cards ── */
+        .strat-card {
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 14px;
+            margin-bottom: 10px;
+            position: relative
+        }
+
+        .strat-card.top {
+            border-left: 4px solid #111
+        }
+
+        .strat-score {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 1.1rem;
+            font-weight: 700
+        }
+
+        .strat-name {
+            font-size: .88rem;
+            font-weight: 700;
+            margin-bottom: 4px
+        }
+
+        .strat-meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 8px
+        }
+
+        .strat-reasons {
+            font-size: .72rem;
+            color: #555;
+            margin-bottom: 6px
+        }
+
+        .strat-reason {
+            padding: 2px 0;
+            border-left: 2px solid #1a7a3c;
+            padding-left: 6px;
+            margin-bottom: 3px
+        }
+
+        .strat-warning {
+            padding: 2px 0;
+            border-left: 2px solid #c0392b;
+            padding-left: 6px;
+            margin-bottom: 3px;
+            color: #c0392b
+        }
+
+        .strat-legs {
+            font-size: .72rem;
+            background: #f8f8f8;
+            border-radius: 2px;
+            padding: 8px;
+            margin-top: 8px
+        }
+
+        .leg-row {
+            display: flex;
+            gap: 12px;
+            padding: 3px 0;
+            border-bottom: 1px solid #eee
+        }
+
+        .leg-row:last-child {
+            border-bottom: none
+        }
+
+        /* ── Regime badge ── */
+        .regime-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 2px;
+            font-size: .72rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase
+        }
+
+        .regime-trending-up {
+            background: #e8f5e9;
+            color: var(--green);
+            border: 1px solid #c8e6c9
+        }
+
+        .regime-trending-down {
+            background: #fce4e4;
+            color: var(--red);
+            border: 1px solid #f5c6c6
+        }
+
+        .regime-ranging {
+            background: #e3eaf5;
+            color: var(--blue);
+            border: 1px solid #c5d3e8
+        }
+
+        .regime-crash {
+            background: #111;
+            color: #fff
+        }
+
+        .regime-uncertain {
+            background: #f5f5f5;
+            color: #555;
+            border: 1px solid #ddd
+        }
+
+        /* ── Vol gauge ── */
+        .vol-gauge {
+            display: flex;
+            flex-direction: column;
+            gap: 4px
+        }
+
+        .gauge-bar {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width .5s
+        }
+
+        .gauge-cheap {
+            background: var(--green)
+        }
+
+        .gauge-fair {
+            background: var(--gold)
+        }
+
+        .gauge-expensive {
+            background: var(--red)
+        }
+
+        /* ── Greeks grid ── */
+        .greeks-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px
+        }
+
+        .greek-box {
+            text-align: center;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 2px
+        }
+
+        .greek-name {
+            font-size: .62rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: .06em
+        }
+
+        .greek-val {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-top: 2px
+        }
+
+        /* ── Chain table ── */
+        .chain-wrap {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px
+        }
+
+        .chain-label {
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 6px
+        }
+
+        .ce-label {
+            color: var(--green)
+        }
+
+        .pe-label {
+            color: var(--red)
+        }
+
+        .atm-row td {
+            background: #fffbe6;
+            font-weight: 600
+        }
+
+        /* ── Canvas ── */
+        canvas {
+            max-height: 260px
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f5f5f5
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px
+        }
+
+        /* ── Responsive ── */
+        @media(max-width:900px) {
+            .body {
+                grid-template-columns: 1fr
+            }
+
+            nav {
+                display: none
+            }
+
+            .grid2,
+            .grid3,
+            .grid4 {
+                grid-template-columns: 1fr
+            }
+
+            .chain-wrap {
+                grid-template-columns: 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="shell">
+
+        <header>
+            <h1>Options Intelligence</h1>
+            <span class="hbadge" id="ws-badge">Connecting</span>
+            <span class="hbadge" id="mkt-badge">Market</span>
+            <span id="hstatus"></span>
+            <span class="htime" id="htime"></span>
+        </header>
+
+        <div class="body">
+            <nav>
+                <div class="nav-section">Market</div>
+                <div class="nav-item active" onclick="show('dashboard')"><span class="nav-dot green"></span>Dashboard
+                </div>
+                <div class="nav-item" onclick="show('chain')"><span class="nav-dot"></span>Option Chain</div>
+                <div class="nav-item" onclick="show('vol')"><span class="nav-dot"></span>Volatility</div>
+
+                <div class="nav-section">Strategy</div>
+                <div class="nav-item" onclick="show('strategy')"><span class="nav-dot green"></span>Strategy Engine
+                </div>
+                <div class="nav-item" onclick="show('signals')"><span class="nav-dot"></span>ML Signals</div>
+
+                <div class="nav-section">Analytics</div>
+                <div class="nav-item" onclick="show('greeks')"><span class="nav-dot"></span>Greeks</div>
+                <div class="nav-item" onclick="show('history')"><span class="nav-dot"></span>Historical</div>
+            </nav>
+
+            <main>
+
+                <!-- ── DASHBOARD ── -->
+                <div class="page active" id="page-dashboard">
+                    <div class="grid4" id="kpi-row" style="margin-bottom:16px"></div>
+                    <div class="grid2">
+                        <div class="card">
+                            <div class="card-title">Live Index</div>
+                            <div id="index-list">
+                                <p style="color:#999;font-size:.8rem">Waiting for data…</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">Vol Regime — All Assets</div>
+                            <div id="vol-regime-list"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Top Strategy Recommendations</div>
+                        <div class="controls">
+                            <select id="dash-asset" onchange="loadDashboard()">
+                                <option>NIFTY</option>
+                                <option>BANKNIFTY</option>
+                                <option>FINNIFTY</option>
+                                <option>MIDCPNIFTY</option>
+                                <option>SENSEX</option>
+                                <option>BANKEX</option>
+                            </select>
+                            <select id="dash-dte">
+                                <option value="7">7 DTE</option>
+                                <option value="14">14 DTE</option>
+                                <option value="21">21 DTE</option>
+                                <option value="30">30 DTE</option>
+                            </select>
+                            <button onclick="loadDashboard()">Refresh</button>
+                        </div>
+                        <div id="top-strategies"></div>
+                    </div>
+                </div>
+
+                <!-- ── OPTION CHAIN ── -->
+                <div class="page" id="page-chain">
+                    <div class="card">
+                        <div class="card-title">Option Chain</div>
+                        <div class="controls">
+                            <select id="oc-asset">
+                                <option>NIFTY</option>
+                                <option>BANKNIFTY</option>
+                                <option>FINNIFTY</option>
+                                <option>MIDCPNIFTY</option>
+                                <option>SENSEX</option>
+                                <option>BANKEX</option>
+                            </select>
+                            <select id="oc-exchange">
+                                <option>NSE</option>
+                                <option>BSE</option>
+                            </select>
+                            <input id="oc-expiry" placeholder="YYYYMMDD" style="width:110px" />
+                            <button onclick="fetchChain()">Load</button>
+                            <span id="atm-info" style="font-size:.75rem;color:#555;margin-left:8px"></span>
+                        </div>
+                        <div class="chain-wrap">
+                            <div>
+                                <div class="chain-label ce-label">Calls (CE)</div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Strike</th>
+                                            <th>LTP</th>
+                                            <th>IV%</th>
+                                            <th>Delta</th>
+                                            <th>Gamma</th>
+                                            <th>Theta</th>
+                                            <th>Vega</th>
+                                            <th>OI</th>
+                                            <th>Vol</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ce-table"></tbody>
+                                </table>
+                            </div>
+                            <div>
+                                <div class="chain-label pe-label">Puts (PE)</div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Strike</th>
+                                            <th>LTP</th>
+                                            <th>IV%</th>
+                                            <th>Delta</th>
+                                            <th>Gamma</th>
+                                            <th>Theta</th>
+                                            <th>Vega</th>
+                                            <th>OI</th>
+                                            <th>Vol</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pe-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── VOLATILITY ── -->
+                <div class="page" id="page-vol">
+                    <div class="controls">
+                        <select id="vol-asset" onchange="fetchVol()">
+                            <option>NIFTY</option>
+                            <option>BANKNIFTY</option>
+                            <option>FINNIFTY</option>
+                            <option>MIDCPNIFTY</option>
+                            <option>SENSEX</option>
+                            <option>BANKEX</option>
+                        </select>
+                        <button onclick="fetchVol()">Refresh</button>
+                    </div>
+                    <div class="grid4" id="vol-kpis" style="margin-bottom:16px"></div>
+                    <div class="grid2">
+                        <div class="card">
+                            <div class="card-title">GARCH Model Comparison</div>
+                            <canvas id="garch-chart"></canvas>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">5-Day Vol Forecast</div>
+                            <canvas id="forecast-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">SARIMA Return Forecast</div>
+                        <div id="sarima-result"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">All Assets — Vol Summary</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>GARCH 1d%</th>
+                                    <th>Ann.Vol%</th>
+                                    <th>Realized 20d%</th>
+                                    <th>IV%</th>
+                                    <th>IV Percentile</th>
+                                    <th>VRP</th>
+                                    <th>PCR</th>
+                                    <th>Regime</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vol-all-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ── STRATEGY ENGINE ── -->
+                <div class="page" id="page-strategy">
+                    <div class="card">
+                        <div class="card-title">Strategy Recommendation Engine</div>
+                        <div class="controls">
+                            <select id="st-asset">
+                                <option>NIFTY</option>
+                                <option>BANKNIFTY</option>
+                                <option>FINNIFTY</option>
+                                <option>MIDCPNIFTY</option>
+                                <option>SENSEX</option>
+                                <option>BANKEX</option>
+                            </select>
+                            <select id="st-dte">
+                                <option value="7">7 DTE</option>
+                                <option value="14">14 DTE</option>
+                                <option value="21">21 DTE</option>
+                                <option value="30">30 DTE</option>
+                            </select>
+                            <button onclick="fetchStrategy()">Analyse</button>
+                        </div>
+                        <div id="regime-display" style="margin-bottom:14px"></div>
+                        <div id="strategy-list"></div>
+                    </div>
+                    <div class="card" id="strike-calc-card" style="display:none">
+                        <div class="card-title">Strike Calculator</div>
+                        <div id="strike-result"></div>
+                    </div>
+                </div>
+
+                <!-- ── ML SIGNALS ── -->
+                <div class="page" id="page-signals">
+                    <div class="controls">
+                        <select id="sig-asset">
+                            <option>NIFTY</option>
+                            <option>BANKNIFTY</option>
+                            <option>FINNIFTY</option>
+                            <option>MIDCPNIFTY</option>
+                        </select>
+                        <button onclick="fetchSignals()">Get Signals</button>
+                        <button class="outline" onclick="fetchAllSignals()">All Assets</button>
+                    </div>
+                    <div class="grid2">
+                        <div class="card">
+                            <div class="card-title ce-label">CE Signals</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Strike</th>
+                                        <th>LTP</th>
+                                        <th>IV%</th>
+                                        <th>Delta</th>
+                                        <th>OI</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ce-signals"></tbody>
+                            </table>
+                        </div>
+                        <div class="card">
+                            <div class="card-title pe-label">PE Signals</div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Strike</th>
+                                        <th>LTP</th>
+                                        <th>IV%</th>
+                                        <th>Delta</th>
+                                        <th>OI</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pe-signals"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card" id="all-signals-card" style="display:none">
+                        <div class="card-title">All Assets — Signal Summary</div>
+                        <div id="all-signals-content"></div>
+                    </div>
+                </div>
+
+                <!-- ── GREEKS ── -->
+                <div class="page" id="page-greeks">
+                    <div class="controls">
+                        <select id="gr-asset" onchange="fetchGreeks()">
+                            <option>NIFTY</option>
+                            <option>BANKNIFTY</option>
+                            <option>FINNIFTY</option>
+                            <option>MIDCPNIFTY</option>
+                        </select>
+                        <button onclick="fetchGreeks()">Load</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Greeks Across Strikes</div>
+                        <div class="grid2">
+                            <canvas id="delta-chart"></canvas>
+                            <canvas id="gamma-chart"></canvas>
+                        </div>
+                        <div class="grid2" style="margin-top:16px">
+                            <canvas id="theta-chart"></canvas>
+                            <canvas id="vega-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">IV Smile</div>
+                        <canvas id="iv-smile-chart"></canvas>
+                    </div>
+                </div>
+                <div class="card live-only">
+                    <div class="card-title">Live Greeks Ticks (WebSocket)</div>
+                    <div class="market-closed-msg" style="display:none;color:#888;font-size:.78rem;padding:8px 0">
+                        ○ Market closed — live Greeks stream inactive. Opens 09:15 IST.
+                    </div>
+                    <table><thead><tr><th>Inst ID</th><th>LTP</th><th>IV%</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>OI</th></tr></thead>
+                    <tbody id="live-greeks-table"><tr><td colspan="8" style="color:#999">Waiting for WebSocket data…</td></tr></tbody></table>
+                </div>
+
+                <!-- ── HISTORICAL ── -->
+                <div class="page" id="page-history">
+                    <div class="controls">
+                        <select id="h-asset">
+                            <option>NIFTY</option>
+                            <option>BANKNIFTY</option>
+                            <option>FINNIFTY</option>
+                            <option>MIDCPNIFTY</option>
+                            <option>SENSEX</option>
+                            <option>BANKEX</option>
+                        </select>
+                        <select id="h-interval">
+                            <option value="1d">1D</option>
+                            <option value="1h">1H</option>
+                            <option value="15m">15m</option>
+                            <option value="5m">5m</option>
+                        </select>
+                        <input id="h-start" value="2025-01-01T03:45:00.000Z" style="width:200px" />
+                        <button onclick="fetchHistorical()">Load</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Price History</div>
+                        <canvas id="hist-chart"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Normalised Returns — All Assets</div>
+                        <canvas id="norm-chart"></canvas>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+        const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000'
+  : (window.RENDER_API_URL || 'https://options-intelligence-api.onrender.com');
+        let charts = {}, refreshTimers = {}, lastData = {};
+
+        // ── Utilities ─────────────────────────────────────────────────────────────────
+        const fmt = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) : '—';
+        const fmtN = (v) => v != null ? Number(v).toLocaleString('en-IN') : '—';
+        const fmtP = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) + '%' : '—';
+        const clr = (v) => v > 0 ? 'up' : v < 0 ? 'down' : 'neutral';
+
+        async function api(path) {
+            const r = await fetch(API + path);
+            if (!r.ok) throw new Error(`${r.status} ${path}`);
+            return r.json();
+        }
+
+        // ── Navigation ────────────────────────────────────────────────────────────────
+        function show(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('page-' + page)?.classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => {
+                if (n.getAttribute('onclick')?.includes("'" + page + "'")) n.classList.add('active');
+            });
+            const loaders = { vol: 'loadVol', greeks: 'loadGreeks', history: 'loadHistory', signals: 'loadSignals', strategy: 'loadStrategy' };
+            if (loaders[page]) window[loaders[page]]?.();
+        }
+
+        // ── Clock + market status ─────────────────────────────────────────────────────
+        setInterval(() => {
+            document.getElementById('htime').textContent = new Date().toLocaleTimeString('en-IN', { hour12: false });
+        }, 1000);
+
+        let mktStatus = 'unknown';
+        async function checkHealth() {
+            try {
+                const d = await api('/health');
+                mktStatus = d.market_status || 'unknown';
+                const b = document.getElementById('mkt-badge');
+                b.textContent = mktStatus === 'open' ? '● MARKET OPEN' : mktStatus === 'post_market' ? '◐ POST-MARKET' : '○ MARKET CLOSED';
+                b.className = 'hbadge' + (mktStatus === 'open' ? ' live' : '');
+                b.title = d.note || '';
+                document.getElementById('hstatus').textContent = d.ist_time || '';
+                // Show/hide live-only panels
+                document.querySelectorAll('.live-only').forEach(el => {
+                    el.style.opacity = mktStatus === 'open' ? '1' : '0.5';
+                });
+                document.querySelectorAll('.market-closed-msg').forEach(el => {
+                    el.style.display = mktStatus === 'open' ? 'none' : 'block';
+                });
+            } catch (e) { }
+        }
+        setInterval(checkHealth, 30000);
+        checkHealth();
+
+        // ── WebSocket live ticks ──────────────────────────────────────────────────────
+        function connectWS() {
+            const badge = document.getElementById('ws-badge');
+            const wsUrl = API.replace('https://','wss://').replace('http://','ws://') + '/ws/live';
+  const ws = new WebSocket(wsUrl);
+            ws.onopen = () => { badge.textContent = '● WS'; badge.className = 'hbadge live'; };
+            ws.onclose = () => { badge.textContent = '○ WS'; badge.className = 'hbadge'; setTimeout(connectWS, 3000); };
+            ws.onerror = () => { badge.textContent = '✗ WS'; badge.className = 'hbadge'; };
+            ws.onmessage = e => {
+                try {
+                    const d = JSON.parse(e.data);
+                    lastData.indexes = d.indexes || [];
+                    lastData.greeks = d.greeks || [];
+                    renderLiveIndexes(lastData.indexes);
+                    if (document.getElementById('page-greeks')?.classList.contains('active')) {
+                        renderLiveGreeks(lastData.greeks);
+                    }
+                } catch (ex) { }
+            };
+        }
+
+        function renderLiveIndexes(indexes) {
+            const el = document.getElementById('index-list');
+            if (!el) return;
+            if (!indexes.length) {
+                el.innerHTML = `<div class="market-closed-msg" style="color:#888;font-size:.8rem;padding:12px 0">
+      Market closed — showing last available data</div>`;
+                loadLastIndexData();
+                return;
+            }
+            el.innerHTML = indexes.map(i => {
+                const val = (i.index_value / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                const chg = (i.changepercent || 0).toFixed(2);
+                const cls = chg >= 0 ? 'up' : 'down';
+                return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">
+      <span style="font-weight:600">${i.indexname}</span>
+      <div style="text-align:right">
+        <div style="font-size:1rem;font-weight:700">${val}</div>
+        <div class="${cls}" style="font-size:.72rem">${chg >= 0 ? '+' : ''}${chg}%</div>
+      </div></div>`;
+            }).join('');
+        }
+
+        async function loadLastIndexData() {
+            // When market closed, show last candle prices
+            try {
+                const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'];
+                const rows = await Promise.all(assets.map(async a => {
+                    const d = await api(`/historical?symbol=${a}&interval=1d&start=2025-01-01T00:00:00.000Z&fields=close`);
+                    const closes = d.result?.[0]?.values?.[0]?.[a]?.close || [];
+                    if (!closes.length) return null;
+                    const last = closes[closes.length - 1];
+                    const prev = closes.length > 1 ? closes[closes.length - 2] : last;
+                    const chg = ((last.v - prev.v) / prev.v * 100).toFixed(2);
+                    return { name: a, val: (last.v / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 }), chg };
+                }));
+                const el = document.getElementById('index-list');
+                el.innerHTML = `<div style="font-size:.65rem;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Last Close</div>` +
+                    rows.filter(Boolean).map(r => `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">
+          <span style="font-weight:600">${r.name}</span>
+          <div style="text-align:right">
+            <div style="font-size:1rem;font-weight:700">${r.val}</div>
+            <div class="${r.chg >= 0 ? 'up' : 'down'}" style="font-size:.72rem">${r.chg >= 0 ? '+' : ''}${r.chg}%</div>
+          </div></div>`).join('');
+            } catch (e) { }
+        }
+
+        // ── Dashboard ─────────────────────────────────────────────────────────────────
+        async function loadDashboard() {
+            const asset = document.getElementById('dash-asset')?.value || 'NIFTY';
+            const dte = document.getElementById('dash-dte')?.value || '7';
+
+            // KPIs from vol forecast
+            try {
+                const vf = await api(`/vol-forecast?symbol=${asset}`);
+                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
+                const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
+                document.getElementById('kpi-row').innerHTML = [
+                    { label: 'GARCH 1d Vol', value: v1d + '%', sub: 'Ann: ' + vann + '%', color: parseFloat(v1d) > 2.5 ? '#c0392b' : '#111' },
+                    { label: 'Realized 20d', value: fmtP(vf.realized_vol_20d), sub: '5d: ' + fmtP(vf.realized_vol_5d), color: '#111' },
+                    { label: 'IV Percentile', value: fmtP(vf.iv_percentile), sub: 'Regime: ' + (vf.vol_regime || '—'), color: (vf.iv_percentile || 50) > 70 ? '#c0392b' : (vf.iv_percentile || 50) < 30 ? '#1a7a3c' : '#b8860b' },
+                    { label: 'Vol Risk Prem', value: fmtP(vf.vol_risk_premium), sub: 'PCR: ' + (vf.pcr || '—'), color: (vf.vol_risk_premium || 0) > 0 ? '#c0392b' : '#1a7a3c' },
+                ].map(k => `<div class="kpi">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="color:${k.color}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div></div>`).join('');
+            } catch (e) { }
+
+            // Vol regimes all assets
+            loadVolRegimes();
+
+            // Strategy
+            try {
+                const d = await api(`/strategy-recommend?asset=${asset}&dte=${dte}`);
+                renderTopStrategies(d.top_recommendations || [], d);
+            } catch (e) { }
+        }
+
+        async function loadVolRegimes() {
+            const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
+            const el = document.getElementById('vol-regime-list');
+            el.innerHTML = '<div style="color:#999;font-size:.75rem">Loading…</div>';
+            const results = await Promise.allSettled(assets.map(a => api(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
+            el.innerHTML = results.map(r => {
+                if (r.status !== 'fulfilled') return '';
+                const [asset, vf] = r.value;
+                const reg = vf.vol_regime || 'fair';
+                const ivp = vf.iv_percentile || 50;
+                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
+                const color = reg === 'cheap' ? '#1a7a3c' : reg === 'expensive' ? '#c0392b' : '#b8860b';
+                return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-weight:600;font-size:.8rem">${asset}</span>
+        <span style="font-size:.7rem;color:${color};font-weight:700;text-transform:uppercase">${reg} ${fmtP(ivp)}</span>
+      </div>
+      <div class="gauge-bar"><div class="gauge-fill gauge-${reg}" style="width:${Math.min(ivp, 100)}%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:.67rem;color:#888;margin-top:2px">
+        <span>GARCH: ${v1d}%</span><span>RV20: ${fmtP(vf.realized_vol_20d)}</span><span>PCR: ${vf.pcr || '—'}</span>
+      </div></div>`;
+            }).join('');
+        }
+
+        function renderTopStrategies(strategies, data) {
+            const el = document.getElementById('top-strategies');
+            if (!strategies.length) { el.innerHTML = '<p style="color:#999;font-size:.8rem">No recommendations</p>'; return; }
+            const cond = data.condition_analysis || {};
+            el.innerHTML = `<div style="padding:8px;background:#f8f8f8;border-radius:2px;font-size:.73rem;margin-bottom:10px">
+    <strong>${data.regime || '—'}</strong> &nbsp;|&nbsp; ${cond.trend || '—'} &nbsp;|&nbsp; ${cond.volatility_environment || '—'}<br>
+    <span style="color:#555">${cond.overall_outlook || ''}</span></div>` +
+                strategies.map((s, i) => {
+                    const score = s.score || 0;
+                    const sc = score > 70 ? '#1a7a3c' : score > 50 ? '#b8860b' : '#c0392b';
+                    const tf = s.trend_fit || 'neutral';
+                    return `<div class="strat-card ${i === 0 ? 'top' : ''}">
+      <div class="strat-score" style="color:${sc}">${score.toFixed(0)}</div>
+      <div class="strat-name">${s.name}</div>
+      <div class="strat-meta">
+        <span class="tag tag-grey">${s.category || '—'}</span>
+        <span class="tag tag-${tf === 'bullish' ? 'green' : tf === 'bearish' ? 'red' : 'blue'}">${tf}</span>
+      </div>
+      <div style="font-size:.71rem;color:#555;margin-bottom:6px">${s.best_for || s.description || '—'}</div>
+      <button class="outline" style="font-size:.68rem" onclick="calcStrikes('${s.strategy_key}')">Details →</button>
+    </div>`;
+                }).join('');
+        }
+
+        // ── Option Chain ──────────────────────────────────────────────────────────────
+        async function fetchChain() {
+            const sym = document.getElementById('oc-asset').value;
+            const exc = document.getElementById('oc-exchange').value;
+            const exp = document.getElementById('oc-expiry').value;
+            if (!exp) { alert('Enter expiry YYYYMMDD'); return; }
+            try {
+                const d = await api(`/option-chain?instrument=${sym}&exchange=${exc}&expiry=${exp}`);
+                const chain = d.chain || {};
+                const atm = chain.atm ? chain.atm / 100 : null;
+                document.getElementById('atm-info').textContent =
+                    atm ? `ATM: ${atm.toLocaleString('en-IN')}  |  Spot: ${(chain.cp / 100).toLocaleString('en-IN')}  |  Expiry: ${exp}` : '';
+                renderChainTable('ce-table', chain.ce || [], atm);
+                renderChainTable('pe-table', chain.pe || [], atm);
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        function renderChainTable(id, items, atm) {
+            document.getElementById(id).innerHTML = [...items]
+                .sort((a, b) => (a.sp || 0) - (b.sp || 0))
+                .slice(0, 30).map(i => {
+                    const strike = (i.sp / 100).toFixed(0);
+                    const isAtm = atm && Math.abs(i.sp / 100 - atm) < 50;
+                    const ltp = i.ltp != null ? (i.ltp / 100).toFixed(2) : '—';
+                    const iv = i.iv != null ? (i.iv * 100).toFixed(1) : '—';
+                    const ivColor = i.iv > 0.3 ? '#c0392b' : i.iv > 0.2 ? '#b8860b' : '#1a7a3c';
+                    return `<tr class="${isAtm ? 'atm-row' : ''}">
+        <td><strong>${Number(strike).toLocaleString('en-IN')}</strong></td>
+        <td>${ltp}</td>
+        <td style="color:${ivColor}">${iv}</td>
+        <td class="${clr(i.delta)}">${fmt(i.delta, 3)}</td>
+        <td>${fmt(i.gamma, 5)}</td>
+        <td class="${clr(i.theta)}">${fmt(i.theta, 2)}</td>
+        <td>${fmt(i.vega, 2)}</td>
+        <td>${fmtN(i.oi)}</td>
+        <td>${fmtN(i.volume)}</td>
+      </tr>`;
+                }).join('');
+        }
+
+        // ── Volatility ────────────────────────────────────────────────────────────────
+        async function loadVol() {
+            const asset = document.getElementById('vol-asset')?.value || 'NIFTY';
+            try {
+                const vf = await api(`/vol-forecast?symbol=${asset}`);
+                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || 0;
+                const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || 0;
+
+                // KPI tiles
+                document.getElementById('vol-kpis').innerHTML = [
+                    { label: 'GARCH 1d', value: v1d + '%', sub: 'Ann: ' + vann + '%', color: parseFloat(v1d) > 2.5 ? '#c0392b' : '#111' },
+                    { label: 'Realized 20d', value: fmtP(vf.realized_vol_20d), sub: '5d: ' + fmtP(vf.realized_vol_5d), color: '#111' },
+                    { label: 'Current IV', value: fmtP(vf.current_iv_pct), sub: 'Pct: ' + fmtP(vf.iv_percentile), color: (vf.iv_percentile || 50) > 70 ? '#c0392b' : '#111' },
+                    { label: 'Vol Risk Prem', value: fmtP(vf.vol_risk_premium), sub: 'PCR: ' + (vf.pcr || '—'), color: (vf.vol_risk_premium || 0) > 0 ? '#c0392b' : '#1a7a3c' },
+                ].map(k => `<div class="kpi"><div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="color:${k.color}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+                // GARCH model comparison
+                const models = vf.models || {};
+                const mNames = Object.keys(models);
+                const mVols = mNames.map(m => models[m].vol_1d || 0);
+                const mAics = mNames.map(m => models[m].aic || 0);
+                const bestIdx = mAics.indexOf(Math.min(...mAics));
+                const ctx1 = document.getElementById('garch-chart').getContext('2d');
+                if (charts.garch) charts.garch.destroy();
+                charts.garch = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: mNames,
+                        datasets: [
+                            { label: '1-Day Vol%', data: mVols, backgroundColor: mNames.map((_, i) => i === bestIdx ? '#111' : '#aaa'), borderRadius: 2 },
+                        ]
+                    },
+                    options: {
+                        animation: false, plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { afterLabel: (c) => `AIC: ${mAics[c.dataIndex].toFixed(1)}` } }
+                        },
+                        scales: { x: { ticks: { color: '#555' } }, y: { ticks: { color: '#555' }, title: { display: true, text: 'Vol %' } } }
+                    }
+                });
+
+                // 5-day forecast
+                const sarima = vf.sarima_forecast || [];
+                const ctx2 = document.getElementById('forecast-chart').getContext('2d');
+                if (charts.forecast) charts.forecast.destroy();
+                charts.forecast = new Chart(ctx2, {
+                    type: 'line',
+                    data: {
+                        labels: ['D+1', 'D+2', 'D+3', 'D+4', 'D+5'],
+                        datasets: [{
+                            label: 'SARIMA Return%', data: sarima,
+                            borderColor: '#111', borderWidth: 2, pointRadius: 5,
+                            pointBackgroundColor: sarima.map(v => v >= 0 ? '#1a7a3c' : '#c0392b'), fill: false
+                        }]
+                    },
+                    options: {
+                        animation: false, plugins: { legend: { labels: { color: '#111' } } },
+                        scales: {
+                            x: { ticks: { color: '#555' } },
+                            y: {
+                                ticks: { color: '#555' }, grid: { color: '#f0f0f0' },
+                                title: { display: true, text: 'Return %' }
+                            }
+                        }
+                    }
+                });
+
+                // SARIMA info
+                document.getElementById('sarima-result').innerHTML = sarima.length
+                    ? `<div style="font-size:.78rem;margin-bottom:8px">Model: <strong>${vf.sarima_model || '—'}</strong></div>
+         <div style="display:flex;gap:10px">${sarima.map((v, i) =>
+                        `<div class="kpi" style="flex:1"><div class="kpi-label">Day ${i + 1}</div>
+            <div class="kpi-value ${v >= 0 ? 'up' : 'down'}" style="font-size:1rem">${v >= 0 ? '+' : ''}${v}%</div></div>`
+                    ).join('')}</div>`
+                    : '<p style="color:#999;font-size:.8rem">No SARIMA forecast available</p>';
+
+                // All assets table
+                loadVolAllTable();
+            } catch (e) { console.error('vol:', e); }
+        }
+
+        async function loadVolAllTable() {
+            const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
+            const rows = await Promise.allSettled(assets.map(a => api(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
+            document.getElementById('vol-all-table').innerHTML = rows.map(r => {
+                if (r.status !== 'fulfilled') return '';
+                const [a, vf] = r.value;
+                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
+                const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
+                const reg = vf.vol_regime || 'fair';
+                const rc = reg === 'cheap' ? 'tag-green' : reg === 'expensive' ? 'tag-red' : 'tag-gold';
+                const vrp = vf.vol_risk_premium || 0;
+                return `<tr>
+      <td><strong>${a}</strong></td>
+      <td>${v1d}</td><td>${vann}</td>
+      <td>${fmtP(vf.realized_vol_20d)}</td>
+      <td>${fmtP(vf.current_iv_pct)}</td>
+      <td>${fmtP(vf.iv_percentile)}</td>
+      <td class="${vrp > 0 ? 'down' : 'up'}">${fmtP(vrp)}</td>
+      <td>${vf.pcr || '—'}</td>
+      <td><span class="tag ${rc}">${reg}</span></td>
+    </tr>`;
+            }).join('');
+        }
+
+        // ── Strategy ──────────────────────────────────────────────────────────────────
+        async function loadStrategy() {
+            const asset = document.getElementById('st-asset')?.value || 'NIFTY';
+            const dte = document.getElementById('st-dte')?.value || '7';
+            try {
+                const d = await api(`/strategy-recommend?asset=${asset}&dte=${dte}`);
+                const cond = d.condition_analysis || {};
+                document.getElementById('regime-display').innerHTML = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <span class="regime-badge regime-${(d.regime || 'uncertain').replace(/_/g, '-')}">${d.regime || '—'}</span>
+        <span style="font-size:.73rem">Trend: <strong>${cond.trend || '—'}</strong></span>
+        <span style="font-size:.73rem">Vol: <strong>${cond.volatility_environment || '—'}</strong></span>
+        <span style="font-size:.73rem">IV: <strong>${cond.iv_status || '—'}</strong></span>
+        <span style="font-size:.73rem">Spot Δ: <strong class="${clr(d.spot_change_pct)}">${fmt(d.spot_change_pct)}%</strong></span>
+        <span style="font-size:.73rem">IV Level: <strong>${fmt(d.iv_level)}%</strong></span>
+        <span style="font-size:.73rem">IV Rank: <strong>${fmt(d.iv_rank)}%</strong></span>
+      </div>
+      <div style="font-size:.71rem;color:#555;padding:6px 8px;background:#f8f8f8;border-radius:2px">${cond.overall_outlook || ''}</div>`;
+
+                const strats = d.top_recommendations || [];
+                document.getElementById('strategy-list').innerHTML = strats.map((s, i) => {
+                    const score = s.score || 0;
+                    const sc = score > 70 ? '#1a7a3c' : score > 50 ? '#b8860b' : '#c0392b';
+                    const tf = s.trend_fit || 'neutral';
+                    return `<div class="strat-card ${i === 0 ? 'top' : ''}">
+        <div class="strat-score" style="color:${sc}">${score.toFixed(0)}</div>
+        <div class="strat-name">${s.name}</div>
+        <div class="strat-meta">
+          <span class="tag tag-grey">${s.category || '—'}</span>
+          <span class="tag tag-${tf === 'bullish' ? 'green' : tf === 'bearish' ? 'red' : 'blue'}">${tf}</span>
+          <span class="tag tag-grey">Rank #${s.rank || i + 1}</span>
+        </div>
+        <div style="font-size:.71rem;color:#555;margin-bottom:6px">
+          <strong>Best for:</strong> ${s.best_for || s.description || '—'}<br>
+          <strong>Risk:</strong> ${s.risk_profile || '—'}
+        </div>
+        <button class="outline" style="font-size:.68rem" onclick="calcStrikes('${s.strategy_key}','${asset}')">Details →</button>
+      </div>`;
+                }).join('');
+            } catch (e) { console.error('strategy:', e); }
+        }
+
+        async function calcStrikes(stratKey, asset) {
+            asset = asset || document.getElementById('st-asset')?.value || 'NIFTY';
+            const card = document.getElementById('strike-calc-card');
+            card.style.display = 'block';
+            try {
+                const d = await api(`/strategy-details/${stratKey}?asset=${asset}`);
+                document.getElementById('strike-result').innerHTML = `
+      <div style="margin-bottom:10px">
+        <strong style="font-size:.95rem">${d.name || stratKey}</strong>
+        <span class="tag tag-grey" style="margin-left:8px">${d.category || ''}</span>
+      </div>
+      <div style="font-size:.78rem;color:#555;line-height:1.9">
+        <div>${d.description || ''}</div>
+        <div><strong>Best for:</strong> ${d.best_for || '—'}</div>
+        <div><strong>Risk:</strong> ${d.risk_profile || '—'}</div>
+      </div>`;
+            } catch (e) {
+                document.getElementById('strike-result').innerHTML = `<p style="color:#c0392b">Error: ${e.message}</p>`;
+            }
+            card.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ── ML Signals ────────────────────────────────────────────────────────────────
+        async function loadSignals() {
+            const asset = document.getElementById('sig-asset')?.value || 'NIFTY';
+            try {
+                const d = await api(`/signals?asset=${asset}`);
+                renderSignalTable('ce-signals', d.CE || [], '#1a7a3c');
+                renderSignalTable('pe-signals', d.PE || [], '#c0392b');
+            } catch (e) { console.error('signals:', e); }
+        }
+
+        function renderSignalTable(id, rows, color) {
+            document.getElementById(id).innerHTML = rows.map(r => {
+                const score = r.signal_score || 0;
+                const bar = `<div style="display:flex;align-items:center;gap:5px">
+      <div style="width:${Math.round(score * 60)}px;height:5px;background:${color};border-radius:3px;min-width:2px"></div>
+      <span style="font-weight:700;font-size:.8rem">${(score * 100).toFixed(0)}</span></div>`;
+                // Strikes from live data are already divided by 100 in realtime_model
+                const strike = r.strike ? r.strike.toLocaleString('en-IN') : '—';
+                const ltp = r.ltp ? r.ltp.toFixed(2) : '—';
+                const iv = r.iv ? (r.iv * 100).toFixed(1) + '%' : '—';
+                return `<tr>
+      <td>${strike}</td><td>${ltp}</td><td>${iv}</td>
+      <td class="${clr(r.delta)}">${fmt(r.delta, 3)}</td>
+      <td>${fmtN(r.oi)}</td><td>${bar}</td>
+    </tr>`;
+            }).join('');
+        }
+
+        async function fetchAllSignals() {
+            try {
+                const d = await api('/signals/all');
+                const card = document.getElementById('all-signals-card');
+                card.style.display = 'block';
+                document.getElementById('all-signals-content').innerHTML = Object.entries(d).map(([asset, sigs]) => {
+                    if (sigs.error) return `<div style="padding:6px 0;border-bottom:1px solid #f0f0f0"><strong>${asset}</strong>: <span style="color:#999">${sigs.error}</span></div>`;
+                    const ce = (sigs.CE || [])[0], pe = (sigs.PE || [])[0];
+                    return `<div style="display:flex;gap:16px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">
+        <span style="font-weight:700;width:100px">${asset}</span>
+        <span style="color:#1a7a3c;font-size:.75rem">CE K=${ce?.strike?.toLocaleString() || '—'} score=${ce ? ((ce.signal_score || 0) * 100).toFixed(0) : '—'}</span>
+        <span style="color:#c0392b;font-size:.75rem">PE K=${pe?.strike?.toLocaleString() || '—'} score=${pe ? ((pe.signal_score || 0) * 100).toFixed(0) : '—'}</span>
+      </div>`;
+                }).join('');
+            } catch (e) { }
+        }
+
+        // ── Greeks ────────────────────────────────────────────────────────────────────
+        async function loadGreeks() {
+            const asset = document.getElementById('gr-asset')?.value || 'NIFTY';
+            try {
+                const d = await api(`/iv-surface?asset=${asset}`);
+                if (!Array.isArray(d) || !d.length) return;
+
+                const ce = d.filter(x => x.option_type === 'CE').sort((a, b) => a.strike - b.strike);
+                const pe = d.filter(x => x.option_type === 'PE').sort((a, b) => a.strike - b.strike);
+                const labels = [...new Set(d.map(x => (x.strike / 100).toFixed(0)))];
+                const get = (arr, f) => arr.map(x => x[f] != null ? x[f] : null);
+
+                function mkChart(id, label, ceD, peD, yLabel) {
+                    const ctx = document.getElementById(id)?.getContext('2d');
+                    if (!ctx) return;
+                    if (charts[id]) charts[id].destroy();
+                    charts[id] = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels, datasets: [
+                                { label: 'CE ' + label, data: ceD, borderColor: '#1a7a3c', borderWidth: 1.5, pointRadius: 2, fill: false },
+                                { label: 'PE ' + label, data: peD, borderColor: '#c0392b', borderWidth: 1.5, pointRadius: 2, fill: false },
+                            ]
+                        },
+                        options: {
+                            animation: false, plugins: { legend: { labels: { color: '#111', font: { size: 10 } } } },
+                            scales: {
+                                x: { ticks: { color: '#555', maxTicksLimit: 8 }, grid: { color: '#f0f0f0' } },
+                                y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' }, title: { display: !!yLabel, text: yLabel || '' } }
+                            }
+                        }
+                    });
+                }
+
+                mkChart('delta-chart', 'Delta', get(ce, 'delta'), get(pe, 'delta'), 'Delta');
+                mkChart('gamma-chart', 'Gamma', get(ce, 'gamma'), get(pe, 'gamma'), 'Gamma');
+                mkChart('theta-chart', 'Theta', get(ce, 'theta'), get(pe, 'theta'), 'Theta');
+                mkChart('vega-chart', 'Vega', get(ce, 'vega'), get(pe, 'vega'), 'Vega');
+
+                // IV Smile
+                const ctx = document.getElementById('iv-smile-chart')?.getContext('2d');
+                if (ctx) {
+                    if (charts.iv) charts.iv.destroy();
+                    charts.iv = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels, datasets: [
+                                { label: 'CE IV%', data: ce.map(x => x.iv ? x.iv * 100 : null), borderColor: '#1a7a3c', borderWidth: 2, pointRadius: 3, fill: false },
+                                { label: 'PE IV%', data: pe.map(x => x.iv ? x.iv * 100 : null), borderColor: '#c0392b', borderWidth: 2, pointRadius: 3, fill: false },
+                            ]
+                        },
+                        options: {
+                            animation: false, plugins: { legend: { labels: { color: '#111' } } },
+                            scales: {
+                                x: { ticks: { color: '#555', maxTicksLimit: 10 }, grid: { color: '#f0f0f0' } },
+                                y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' }, title: { display: true, text: 'IV %' } }
+                            }
+                        }
+                    });
+                }
+
+                // Live Greeks from WS if market open
+                if (mktStatus === 'open' && lastData.greeks?.length) {
+                    renderLiveGreeks(lastData.greeks);
+                }
+            } catch (e) { console.error('greeks:', e); }
+        }
+
+        function renderLiveGreeks(greeks) {
+            const el = document.getElementById('live-greeks-table');
+            if (!el || !greeks.length) return;
+            el.innerHTML = greeks.slice(0, 20).map(g => `<tr>
+    <td>${g.inst_id || '—'}</td>
+    <td>${fmt(g.ltp / 100, 2)}</td>
+    <td>${g.iv ? (g.iv * 100).toFixed(1) + '%' : '—'}</td>
+    <td class="${clr(g.delta)}">${fmt(g.delta, 3)}</td>
+    <td>${fmt(g.gamma, 5)}</td>
+    <td class="${clr(g.theta)}">${fmt(g.theta, 2)}</td>
+    <td>${fmt(g.vega, 2)}</td>
+    <td>${fmtN(g.oi)}</td>
+  </tr>`).join('');
+        }
+
+        // ── Historical ────────────────────────────────────────────────────────────────
+        async function loadHistory() {
+            const sym = document.getElementById('h-asset')?.value || 'NIFTY';
+            const interval = document.getElementById('h-interval')?.value || '1d';
+            const start = document.getElementById('h-start')?.value || '2025-01-01T03:45:00.000Z';
+            try {
+                const d = await api(`/historical?symbol=${sym}&interval=${interval}&start=${encodeURIComponent(start)}&fields=open,high,low,close,tick_volume`);
+                const vals = d.result?.[0]?.values?.[0]?.[sym];
+                const closes = vals?.close || [];
+                if (!closes.length) { console.warn('No historical data'); return; }
+
+                const labels = closes.map(p => {
+                    const dt = new Date(p.ts / 1e6);
+                    return interval === '1d' || interval === '1w'
+                        ? dt.toLocaleDateString('en-IN')
+                        : dt.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                });
+                const data = closes.map(p => (p.v / 100).toFixed(2));
+
+                const ctx = document.getElementById('hist-chart')?.getContext('2d');
+                if (!ctx) return;
+                if (charts.hist) charts.hist.destroy();
+                charts.hist = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels, datasets: [{
+                            label: sym + ' Close', data,
+                            borderColor: '#111', borderWidth: 1.5, pointRadius: 0, fill: false
+                        }]
+                    },
+                    options: {
+                        animation: false, plugins: { legend: { labels: { color: '#111' } } },
+                        scales: {
+                            x: { ticks: { color: '#555', maxTicksLimit: 12 }, grid: { color: '#f0f0f0' } },
+                            y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' } }
+                        }
+                    }
+                });
+
+                // Normalised returns
+                loadNormReturns();
+            } catch (e) { console.error('historical:', e); }
+        }
+
+        async function loadNormReturns() {
+            const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
+            const colors = { NIFTY: '#111', BANKNIFTY: '#c0392b', FINNIFTY: '#1a7a3c', MIDCPNIFTY: '#2471a3', SENSEX: '#7d3c98', BANKEX: '#d35400' };
+            const datasets = [];
+            for (const a of assets) {
+                try {
+                    const exc = ['SENSEX', 'BANKEX'].includes(a) ? 'BSE' : 'NSE';
+                    const d = await api(`/historical?symbol=${a}&exchange=${exc}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
+                    const closes = d.result?.[0]?.values?.[0]?.[a]?.close || [];
+                    if (!closes.length) continue;
+                    const base = closes[0].v || closes[0].value;
+                    datasets.push({
+                        label: a, data: closes.map(p => ((p.v / base) * 100).toFixed(2)),
+                        borderColor: colors[a], borderWidth: 1.5, pointRadius: 0, fill: false
+                    });
+                } catch (e) { }
+            }
+            if (!datasets.length) return;
+            const maxLen = Math.max(...datasets.map(d => d.data.length));
+            const ctx = document.getElementById('norm-chart')?.getContext('2d');
+            if (!ctx) return;
+            if (charts.norm) charts.norm.destroy();
+            charts.norm = new Chart(ctx, {
+                type: 'line',
+                data: { labels: Array.from({ length: maxLen }, (_, i) => i + 1), datasets },
+                options: {
+                    animation: false, plugins: { legend: { labels: { color: '#111', font: { size: 10 } } } },
+                    scales: {
+                        x: { ticks: { color: '#555', maxTicksLimit: 10 }, grid: { color: '#f0f0f0' } },
+                        y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' } }
+                    }
+                }
+            });
+        }
+
+        // ── Auto-refresh when market open ─────────────────────────────────────────────
+        function startAutoRefresh() {
+            // Refresh dashboard every 60s when market open
+            setInterval(() => {
+                if (mktStatus === 'open') {
+                    const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
+                    if (activePage === 'dashboard') loadDashboard();
+                    if (activePage === 'vol') loadVol();
+                    if (activePage === 'signals') loadSignals();
+                    if (activePage === 'greeks') loadGreeks();
+                }
+            }, 60000);
+        }
+
+        // ── Init ──────────────────────────────────────────────────────────────────────
+        connectWS();
+        loadDashboard();
+        startAutoRefresh();
+    </script>
+</body>
+
+</html>

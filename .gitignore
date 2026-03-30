@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets — NEVER commit
+.env
+auth_data.db
+auth_data.db.db
+.nubra_token.json
+
+# Large data files — stored on Render persistent disk
+data.db
+data.db-shm
+data.db-wal
+
+# Rust build
+target/
+Cargo.lock
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Logs
+logs/*.log
+server.log
+
+# CatBoost artifacts
+catboost_info/
+
+# Trained models — INCLUDE these (pre-trained, needed for deploy)
+# trained_models/*.pkl  <-- DO NOT ignore, we need them on Render
