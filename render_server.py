@@ -617,22 +617,52 @@ def historical(
 ):
     md = state["market_data"]
     if not md:
-        raise HTTPException(503, "SDK not ready")
+        raise HTTPException(503, "SDK not ready — authentication in progress")
     if end is None:
         end = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    return md.historical_data(
-        {
-            "exchange": exchange,
-            "type": itype,
-            "values": [symbol],
-            "fields": fields.split(","),
-            "startDate": start,
-            "endDate": end,
-            "interval": interval,
-            "intraDay": False,
-            "realTime": False,
+    try:
+        resp = md.historical_data(
+            {
+                "exchange": exchange,
+                "type": itype,
+                "values": [symbol],
+                "fields": fields.split(","),
+                "startDate": start,
+                "endDate": end,
+                "interval": interval,
+                "intraDay": False,
+                "realTime": False,
+            }
+        )
+        # Convert SDK response to JSON-serializable format
+        result = []
+        for chart_data in resp.result or []:
+            values_list = []
+            for sym_dict in chart_data.values or []:
+                sym_entry = {}
+                for sym_name, stock_chart in sym_dict.items():
+                    sym_entry[sym_name] = {}
+                    for field in fields.split(","):
+                        pts = getattr(stock_chart, field, None) or []
+                        sym_entry[sym_name][field] = [
+                            {"timestamp": p.timestamp, "value": p.value} for p in pts
+                        ]
+                values_list.append(sym_entry)
+            result.append(
+                {
+                    "exchange": chart_data.exchange,
+                    "type": chart_data.type,
+                    "values": values_list,
+                }
+            )
+        return {
+            "market_time": str(resp.market_time) if resp.market_time else None,
+            "message": resp.message,
+            "result": result,
         }
-    ).model_dump()
+    except Exception as e:
+        logger.error(f"historical error: {e}")
+        raise HTTPException(500, str(e)) from e
 
 
 @app.get("/iv-surface")
