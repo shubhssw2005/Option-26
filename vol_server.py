@@ -281,16 +281,9 @@ def vol_forecast(
     exchange: str = Query("NSE"),
     interval: str = Query("1d"),
 ):
-    df = query_df(
-        """SELECT ts, close FROM historical_candle
-           WHERE symbol=? AND exchange=? AND interval=? ORDER BY ts""",
-        (symbol, exchange, interval),
-    )
-    if len(df) < 30:
-        return {"error": f"Not enough historical data for {symbol} ({len(df)} rows)"}
-    prices = df["close"]
-    result = vol_ensemble(prices)
-    result["sarima"] = fit_sarima(prices)
+    """Vol forecast — delegates to forecast_asset which handles insufficient data gracefully."""
+    result = forecast_asset(symbol)
+    # forecast_asset returns {"asset": ..., "error": ...} when data is insufficient
     return result
 
 
