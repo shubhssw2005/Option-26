@@ -219,7 +219,7 @@ async def lifespan(_app: FastAPI):
     try:
         from nubra_python_sdk.marketdata.market_data import MarketData
         from nubra_python_sdk.ticker.websocketdata import NubraDataSocket
-        from auto_auth import get_authenticated_client, _token_cache
+        from auto_auth import get_authenticated_client
 
         logger.info("[server] Authenticating...")
         nubra = get_authenticated_client()
