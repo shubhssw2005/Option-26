@@ -124,12 +124,15 @@ def _push_token_to_render(token: str):
 
 
 def _client_from_token(env, token: str):
-    """Create SDK client — updates class-level HEADERS so all API calls use new token."""
+    """
+    Inject token into SDK by writing to shelve + updating class HEADERS.
+    Then do a real InitNubraSdk init which reads from shelve.
+    """
     from nubra_python_sdk.start_sdk import InitNubraSdk
 
     device = get_device_id()
 
-    # Write to shelve
+    # 1. Write to shelve so SDK __init__ reads it
     try:
         with shelve.open("auth_data.db", flag="c", writeback=True) as db:
             db["session_token"] = token
@@ -139,28 +142,40 @@ def _client_from_token(env, token: str):
     except Exception as e:
         logger.warning(f"[auth] Shelve write: {e}")
 
-    # CRITICAL: update class-level HEADERS — BaseHttpClient reads these
+    # 2. Update class-level HEADERS immediately
     InitNubraSdk.HEADERS["Authorization"] = f"Bearer {token}"
     InitNubraSdk.HEADERS["x-device-id"]   = device
     InitNubraSdk.HEADERS["x-app-version"] = "1.0.0"
     InitNubraSdk.HEADERS["x-device-os"]   = "sdk"
     InitNubraSdk.HEADERS["Cookie"]        = f"deviceId={device}"
-    logger.info("[auth] HEADERS updated with new token")
 
-    nubra = object.__new__(InitNubraSdk)
-    nubra.env            = env
-    nubra.totp_login     = False
-    nubra.db_path        = "auth_data.db"
-    nubra.env_path_login = False
-    nubra.token_data     = {"session_token": token, "auth_token": token, "x-device-id": device}
-    nubra.API_BASE_URL   = "https://api.nubra.io"
-    nubra.BEARER_TOKEN   = token
+    # 3. Patch input() to prevent any interactive prompts
+    import builtins
+    orig = builtins.input
+    builtins.input = lambda p="": ""
+    try:
+        # Use __new__ + minimal __init__ state to avoid triggering login
+        nubra = object.__new__(InitNubraSdk)
+        nubra.env            = env
+        nubra.totp_login     = False
+        nubra.db_path        = "auth_data.db"
+        nubra.env_path_login = False
+        nubra.token_data     = {"session_token": token, "auth_token": token, "x-device-id": device}
+        nubra.API_BASE_URL   = "https://api.nubra.io"
+        nubra.BEARER_TOKEN   = token
+        nubra.VERSION        = getattr(InitNubraSdk, "VERSION", "1.0.0")
+        nubra.VERSION_URL    = getattr(InitNubraSdk, "VERSION_URL", "")
 
-    def _auth_flow():
-        InitNubraSdk.HEADERS["Authorization"] = f"Bearer {token}"
-        logger.info("[auth] auth_flow — re-injected token")
-    nubra.auth_flow = _auth_flow
-    return nubra
+        # Patch auth_flow to re-inject token instead of prompting
+        def _auth_flow():
+            InitNubraSdk.HEADERS["Authorization"] = f"Bearer {token}"
+            logger.info("[auth] auth_flow re-injected token")
+        nubra.auth_flow = _auth_flow
+
+        logger.info(f"[auth] Client ready, HEADERS auth set: {InitNubraSdk.HEADERS.get('Authorization','')[:30]}...")
+        return nubra
+    finally:
+        builtins.input = orig
 
 
 def refresh_token_background(state: dict):

@@ -225,7 +225,12 @@ async def lifespan(_app: FastAPI):
         nubra = get_authenticated_client(state)
         if nubra:
             state["nubra"] = nubra
-            state["market_data"] = MarketData(nubra)
+            md = MarketData(nubra)
+            # Force session headers to use the current token
+            from nubra_python_sdk.start_sdk import InitNubraSdk
+
+            md.http_client.session.headers.update(InitNubraSdk.HEADERS)
+            state["market_data"] = md
             logger.info("[server] Auth OK")
 
             # WebSocket
@@ -263,6 +268,7 @@ async def lifespan(_app: FastAPI):
                 try:
                     # Copy models from repo to /tmp if not there
                     import glob, shutil
+
                     repo_models = glob.glob("trained_models/*.pkl")
                     for src in repo_models:
                         dst = os.path.join(MODELS_DIR, os.path.basename(src))
@@ -273,8 +279,11 @@ async def lifespan(_app: FastAPI):
                     logger.info(f"[startup] Models in {MODELS_DIR}: {len(loaded)}")
 
                     from collect_data import init_db, collect_historical
+
                     conn = init_db(DB_PATH)
-                    count = conn.execute("SELECT COUNT(*) FROM historical_candle").fetchone()[0]
+                    count = conn.execute(
+                        "SELECT COUNT(*) FROM historical_candle"
+                    ).fetchone()[0]
                     if count < 10:
                         logger.info("[startup] DB empty — fetching historical data...")
                         collect_historical(state["market_data"], conn)
@@ -284,6 +293,7 @@ async def lifespan(_app: FastAPI):
                     conn.close()
                 except Exception as e:
                     logger.error(f"[startup] Initial load error: {e}")
+
             threading.Thread(target=_initial_load, daemon=True).start()
         else:
             logger.warning("[server] Auth failed — starting without Nubra connection")
@@ -382,24 +392,33 @@ def vol_forecast(
     # If DB empty, fetch live from Nubra API
     if len(df) < 30 and state["market_data"]:
         try:
-            end_dt   = datetime.now(timezone.utc)
+            end_dt = datetime.now(timezone.utc)
             start_dt = end_dt - timedelta(days=90)
-            hist = state["market_data"].historical_data({
-                "exchange": exchange, "type": "INDEX", "values": [symbol],
-                "fields": ["close"], "interval": interval,
-                "startDate": start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                "endDate":   end_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                "intraDay": False, "realTime": False,
-            })
+            hist = state["market_data"].historical_data(
+                {
+                    "exchange": exchange,
+                    "type": "INDEX",
+                    "values": [symbol],
+                    "fields": ["close"],
+                    "interval": interval,
+                    "startDate": start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                    "endDate": end_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                    "intraDay": False,
+                    "realTime": False,
+                }
+            )
             sym_data = hist.result[0].values[0].get(symbol)
             if sym_data and sym_data.close:
-                df = pd.DataFrame([
-                    {"ts": p.timestamp, "close": (p.value or 0) / 100}
-                    for p in sym_data.close
-                ])
+                df = pd.DataFrame(
+                    [
+                        {"ts": p.timestamp, "close": (p.value or 0) / 100}
+                        for p in sym_data.close
+                    ]
+                )
                 # Save to DB for future calls
                 try:
                     from collect_data import init_db, save_index_candles
+
                     conn = init_db(DB_PATH)
                     save_index_candles(conn, hist, symbol, exchange, interval)
                     conn.close()
@@ -410,51 +429,60 @@ def vol_forecast(
             logger.warning(f"[vol] Live fetch failed: {e}")
 
     if len(df) < 30:
-        raise HTTPException(404, f"No data for {symbol} ({len(df)} candles). Try again in 30s.")
+        raise HTTPException(
+            404, f"No data for {symbol} ({len(df)} candles). Try again in 30s."
+        )
 
     # Compute vol directly from df (don't rely on realtime_vol.py DB read)
     try:
         import numpy as np
-        from models.vol_models import fit_garch, fit_egarch, fit_gjr_garch, fit_sarima, realized_vol
+        from models.vol_models import (
+            fit_garch,
+            fit_egarch,
+            fit_gjr_garch,
+            fit_sarima,
+            realized_vol,
+        )
 
         prices = df["close"]
-        g   = fit_garch(prices)
-        e   = fit_egarch(prices)
+        g = fit_garch(prices)
+        e = fit_egarch(prices)
         gjr = fit_gjr_garch(prices)
         sar = fit_sarima(prices)
         rv20 = realized_vol(prices, 20)
-        rv5  = realized_vol(prices, 5)
+        rv5 = realized_vol(prices, 5)
 
         # Weighted ensemble by AIC
         models = {}
         weights = {}
-        for name, r in [("garch",g),("egarch",e),("gjr_garch",gjr)]:
+        for name, r in [("garch", g), ("egarch", e), ("gjr_garch", gjr)]:
             if "error" not in r:
                 models[name] = r
                 weights[name] = 1.0 / max(abs(r["aic"]), 1)
 
         total_w = sum(weights.values()) or 1
-        ens_1d  = sum(models[k]["vol_1d"]  * weights[k] for k in models) / total_w
+        ens_1d = sum(models[k]["vol_1d"] * weights[k] for k in models) / total_w
         ens_ann = sum(models[k]["vol_ann"] * weights[k] for k in models) / total_w
 
         return {
-            "asset":            symbol,
-            "ensemble_vol_1d":  round(ens_1d, 4),
+            "asset": symbol,
+            "ensemble_vol_1d": round(ens_1d, 4),
             "ensemble_vol_ann": round(ens_ann, 4),
             "realized_vol_20d": rv20,
-            "realized_vol_5d":  rv5,
-            "current_iv_pct":   None,
-            "iv_percentile":    None,
+            "realized_vol_5d": rv5,
+            "current_iv_pct": None,
+            "iv_percentile": None,
             "vol_risk_premium": None,
-            "pcr":              None,
-            "sarima_forecast":  sar.get("forecast", []),
-            "sarima_model":     sar.get("model", ""),
-            "vol_regime":       "fair",
-            "models":           models,
+            "pcr": None,
+            "sarima_forecast": sar.get("forecast", []),
+            "sarima_model": sar.get("model", ""),
+            "vol_regime": "fair",
+            "models": models,
         }
     except Exception as e:
         logger.error(f"[vol] Compute error: {e}")
         raise HTTPException(500, str(e)) from e
+
 
 @app.get("/vol-forecast-all")
 def vol_forecast_all():
