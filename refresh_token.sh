@@ -66,7 +66,11 @@ headers = {
 r = requests.put(
     f'https://api.render.com/v1/services/{RENDER_SERVICE_ID}/env-vars',
     headers=headers,
-    json=[{'key': 'NUBRA_SESSION_TOKEN', 'value': token}],
+    json=[
+        {'key': 'NUBRA_SESSION_TOKEN', 'value': token},
+        {'key': 'NUBRA_DEVICE_ID',     'value': device},
+        {'key': 'NUBRA_DEVICE_ID',     'value': device},
+    ],
     timeout=15
 )
 if r.status_code in (200, 201):
