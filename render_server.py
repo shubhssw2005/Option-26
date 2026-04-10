@@ -226,10 +226,17 @@ async def lifespan(_app: FastAPI):
         if nubra:
             state["nubra"] = nubra
             md = MarketData(nubra)
-            # Force session headers to use the current token
-            from nubra_python_sdk.start_sdk import InitNubraSdk
-
-            md.http_client.session.headers.update(InitNubraSdk.HEADERS)
+            # Force HTTP session to use the current token
+            token = os.getenv("NUBRA_SESSION_TOKEN", "")
+            device = os.getenv("NUBRA_DEVICE_ID", "TS123")
+            if token:
+                md.http_client.session.headers.update({
+                    "Authorization": f"Bearer {token}",
+                    "x-device-id":   device,
+                    "x-app-version": "1.0.0",
+                    "x-device-os":   "sdk",
+                })
+                logger.info("[server] Session headers updated with token")
             state["market_data"] = md
             logger.info("[server] Auth OK")
 
