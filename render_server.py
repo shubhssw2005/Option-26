@@ -222,7 +222,14 @@ async def lifespan(_app: FastAPI):
         from auto_auth import get_authenticated_client
 
         logger.info("[server] Authenticating...")
-        nubra = get_authenticated_client()
+        try:
+            nubra = get_authenticated_client()
+        except Exception as auth_err:
+            logger.error(f"[server] Auth error: {auth_err}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            nubra = None
         if nubra:
             state["nubra"] = nubra
             md = MarketData(nubra)
@@ -230,12 +237,14 @@ async def lifespan(_app: FastAPI):
             token = os.getenv("NUBRA_SESSION_TOKEN", "")
             device = os.getenv("NUBRA_DEVICE_ID", "TS123")
             if token:
-                md.client.session.headers.update({
-                    "Authorization": f"Bearer {token}",
-                    "x-device-id":   device,
-                    "x-app-version": "1.0.0",
-                    "x-device-os":   "sdk",
-                })
+                md.client.session.headers.update(
+                    {
+                        "Authorization": f"Bearer {token}",
+                        "x-device-id": device,
+                        "x-app-version": "1.0.0",
+                        "x-device-os": "sdk",
+                    }
+                )
                 logger.info("[server] Session headers updated with token")
             state["market_data"] = md
             logger.info("[server] Auth OK")
