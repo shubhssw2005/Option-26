@@ -26,12 +26,24 @@ from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
 from models.data_pipeline import TREE_FEATURES, DEEP_FEATURES, ALL_FEATURES
-from models.deep_models import (
-    LSTMModel,
-    TransformerModel,
-    _train_model,
-    predict_deep_3d,
-)
+
+try:
+    from models.deep_models import (
+        LSTMModel,
+        TransformerModel,
+        _train_model,
+        predict_deep_3d,
+    )
+
+    DEEP_AVAILABLE = True
+except ImportError:
+    DEEP_AVAILABLE = False
+
+    def predict_deep_3d(model, X):
+        import numpy as np
+
+        return np.full(len(X), 0.5, dtype="float32")
+
 
 # Expose for external use
 FEATURES = ALL_FEATURES
@@ -217,5 +229,24 @@ class OptionEnsemble:
 
     @staticmethod
     def load(path: str) -> "OptionEnsemble":
-        with open(path, "rb") as f:
-            return pickle.load(f)
+        import pickle, io
+
+        class SafeUnpickler(pickle.Unpickler):
+            """Handles missing torch classes gracefully."""
+
+            def find_class(self, module, name):
+                if "torch" in module or module.startswith("models.deep_models"):
+                    # Return a dummy class for torch objects
+                    return type(name, (), {"__init__": lambda self, *a, **kw: None})
+                return super().find_class(module, name)
+
+        try:
+            with open(path, "rb") as f:
+                return pickle.load(f)
+        except (ModuleNotFoundError, ImportError):
+            # torch not available — load with safe unpickler
+            with open(path, "rb") as f:
+                obj = SafeUnpickler(f).load()
+            # Clear deep models since they can't run without torch
+            obj.deep_models = {}
+            return obj

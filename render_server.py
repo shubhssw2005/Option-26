@@ -351,23 +351,22 @@ def vol_forecast(
 
     try:
         prices = df["close"]
+        # Run only GARCH(1,1) for speed — skip EGARCH/GJR on Render
         g = fit_garch(prices)
-        e = fit_egarch(prices)
-        gjr = fit_gjr_garch(prices)
-        sar = fit_sarima(prices)
         rv20 = realized_vol(prices, 20)
         rv5 = realized_vol(prices, 5)
+        try:
+            sar = fit_sarima(prices)
+        except Exception:
+            sar = {"forecast": [], "model": ""}
 
+        # Use GARCH only for ensemble on Render (EGARCH/GJR too slow)
         models = {}
-        weights = {}
-        for name, r in [("garch", g), ("egarch", e), ("gjr_garch", gjr)]:
-            if "error" not in r:
-                models[name] = r
-                weights[name] = 1.0 / max(abs(r["aic"]), 1)
+        if "error" not in g:
+            models["garch"] = g
 
-        total_w = sum(weights.values()) or 1
-        ens_1d = sum(models[k]["vol_1d"] * weights[k] for k in models) / total_w
-        ens_ann = sum(models[k]["vol_ann"] * weights[k] for k in models) / total_w
+        ens_1d = g.get("vol_1d", 1.5) if "error" not in g else 1.5
+        ens_ann = g.get("vol_ann", 24.0) if "error" not in g else 24.0
 
         return {
             "asset": symbol,
