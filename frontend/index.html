@@ -1096,6 +1096,8 @@
             // Vol KPIs
             try {
                 const vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
+                if (vf.error) { err('kpi-row', vf.error); }
+                else {
                 const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
                 const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
                 const ivpColor = (vf.iv_percentile || 50) > 70 ? '#c0392b' : (vf.iv_percentile || 50) < 30 ? '#1a7a3c' : '#b8860b';
@@ -1107,6 +1109,7 @@
                 ].map(k => `<div class="kpi"><div class="kpi-label">${k.label}</div>
       <div class="kpi-value" style="color:${k.color}">${k.value}</div>
       <div class="kpi-sub">${k.sub}</div></div>`).join('');
+                }
             } catch (e) { err('kpi-row', 'Vol data unavailable: ' + e.message); }
 
             // Vol regimes all assets
@@ -1127,6 +1130,7 @@
             el.innerHTML = results.map(r => {
                 if (r.status !== 'fulfilled') return '';
                 const [asset, vf] = r.value;
+                if (vf.error) return '';
                 const reg = vf.vol_regime || 'fair';
                 const ivp = vf.iv_percentile || 50;
                 const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
@@ -1213,6 +1217,8 @@
 
             try {
                 const vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
+                if (vf.error) { err('vol-kpis', vf.error); }
+                else {
                 const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || 0;
                 const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || 0;
 
@@ -1279,14 +1285,16 @@
                     ).join('')}</div>`
                     : '<p style="color:#999;font-size:.8rem">No SARIMA forecast</p>';
 
+                } // end else (no error)
             } catch (e) { err('vol-kpis', 'Vol forecast failed: ' + e.message); }
 
             // All assets table
             const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
             const rows = await Promise.allSettled(assets.map(a => apiFetch(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
             document.getElementById('vol-all-table').innerHTML = rows.map(r => {
-                if (r.status !== 'fulfilled') return `<tr><td>${r.reason?.message?.includes('NIFTY') ? '?' : '?'}</td><td colspan="8" style="color:#999">Loading…</td></tr>`;
+                if (r.status !== 'fulfilled') return `<tr><td>?</td><td colspan="8" style="color:#999">Error</td></tr>`;
                 const [a, vf] = r.value;
+                if (vf.error) return `<tr><td><strong>${a}</strong></td><td colspan="8" style="color:#999">${vf.error}</td></tr>`;
                 const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
                 const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
                 const reg = vf.vol_regime || 'fair';

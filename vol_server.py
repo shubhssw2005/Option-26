@@ -287,7 +287,7 @@ def vol_forecast(
         (symbol, exchange, interval),
     )
     if len(df) < 30:
-        raise HTTPException(status_code=404, detail="Not enough historical data in DB")
+        return {"error": f"Not enough historical data for {symbol} ({len(df)} rows)"}
     prices = df["close"]
     result = vol_ensemble(prices)
     result["sarima"] = fit_sarima(prices)
@@ -299,7 +299,7 @@ def signals(asset: str = Query("NIFTY")):
     try:
         return generate_signals(asset)
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        return {"CE": [], "PE": [], "error": str(e)}
 
 
 @app.get("/signals/all")
