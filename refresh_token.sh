@@ -1,16 +1,7 @@
 #!/bin/zsh
 # refresh_token.sh — Auto-refresh Nubra session token on Render
-#
-# Run this daily (or set up as a cron job):
-#   crontab -e
-#   0 8 * * 1-5 /Users/shubhamsw2005/stock-2026/refresh_token.sh
-#   (runs at 8am IST Mon-Fri, before market opens)
-#
-# Requires:
-#   RENDER_API_KEY  — from Render dashboard → Account → API Keys
-#   RENDER_SERVICE_ID — from Render dashboard → your service → Settings → Service ID
+# Cron: 0 8,20 * * 1-5 /Users/shubhamsw2005/stock-2026/refresh_token.sh
 
-set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 PYTHON="/opt/anaconda3/bin/python3"
 LOG="$DIR/logs/token_refresh.log"
@@ -18,97 +9,78 @@ mkdir -p "$DIR/logs"
 
 echo "[$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M IST')] Refreshing Nubra token..." | tee -a "$LOG"
 
-# Load env
-source "$DIR/.env" 2>/dev/null || true
+"$PYTHON" - << 'PYEOF' 2>&1 | tee -a "$DIR/logs/token_refresh.log"
+import os, sys, shelve, requests, json, base64, datetime
+sys.path.insert(0, '/Users/shubhamsw2005/stock-2026')
+os.chdir('/Users/shubhamsw2005/stock-2026')
 
-# Get fresh token (will prompt for OTP if needed)
-TOKEN=$("$PYTHON" -c "
-import sys, os
-sys.path.insert(0, '$DIR')
-os.chdir('$DIR')
-from auto_auth import get_current_token, _is_token_valid
-token = get_current_token()
-if token and _is_token_valid(token):
-    print(token)
-else:
-    print('')
-" 2>/dev/null)
+RENDER_API_KEY    = 'rnd_KfFjKqMcZgBgLCpjpHj8yQuaKuAk'
+RENDER_SERVICE_ID = 'srv-d755o3haae7s73brnik0'
 
-if [ -z "$TOKEN" ]; then
-    echo "[$(date)] Token invalid or missing — need manual OTP login" | tee -a "$LOG"
-    echo "Run: cd $DIR && /opt/anaconda3/bin/python3 auto_auth.py token"
-    exit 1
-fi
+def get_token():
+    try:
+        with shelve.open('auth_data.db', flag='r') as db:
+            return db.get('session_token',''), db.get('x-device-id','TS123')
+    except Exception:
+        return '', 'TS123'
 
-echo "[$(date)] Token valid (${#TOKEN} chars)" | tee -a "$LOG"
+def is_valid(token, device):
+    if not token: return False
+    try:
+        r = requests.get('https://api.nubra.io/userinfo',
+            headers={'Authorization': f'Bearer {token}', 'x-device-id': device}, timeout=8)
+        return r.status_code == 200
+    except Exception:
+        return False
 
-# Push to Render via API
-if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ]; then
-    echo "[$(date)] Pushing to Render..." | tee -a "$LOG"
-    
-    # Get current env vars
-    ENVVARS=$(curl -s \
-        -H "Authorization: Bearer $RENDER_API_KEY" \
-        -H "Accept: application/json" \
-        "https://api.render.com/v1/services/$RENDER_SERVICE_ID/env-vars")
-    
-    # Update NUBRA_SESSION_TOKEN using Python (easier JSON manipulation)
-    "$PYTHON" -c "
-import json, sys, os, requests
+def hours_left(token):
+    try:
+        payload = json.loads(base64.b64decode(token.split('.')[1]+'=='))
+        exp = datetime.datetime.fromtimestamp(payload['exp'])
+        return (exp - datetime.datetime.now()).total_seconds() / 3600
+    except Exception:
+        return 0
 
-api_key    = '$RENDER_API_KEY'
-service_id = '$RENDER_SERVICE_ID'
-new_token  = '''$TOKEN'''
+token, device = get_token()
+
+if not is_valid(token, device):
+    print('Token invalid — logging in fresh...')
+    from nubra_python_sdk.start_sdk import InitNubraSdk, NubraEnv
+    InitNubraSdk(NubraEnv.PROD, env_creds=True)
+    token, device = get_token()
+
+if not token:
+    print('ERROR: Could not get token')
+    sys.exit(1)
+
+h = hours_left(token)
+print(f'Token valid: {len(token)} chars, {h:.1f}h remaining')
 
 headers = {
-    'Authorization': f'Bearer {api_key}',
+    'Authorization': f'Bearer {RENDER_API_KEY}',
     'Accept': 'application/json',
     'Content-Type': 'application/json',
 }
 
-# Get current env vars
-r = requests.get(f'https://api.render.com/v1/services/{service_id}/env-vars', headers=headers)
-env_vars = r.json()
-
-# Update token
-updated = False
-for ev in env_vars:
-    if ev.get('envVar', {}).get('key') == 'NUBRA_SESSION_TOKEN':
-        ev['envVar']['value'] = new_token
-        updated = True
-        break
-if not updated:
-    env_vars.append({'envVar': {'key': 'NUBRA_SESSION_TOKEN', 'value': new_token}})
-
-# Push
-r2 = requests.put(
-    f'https://api.render.com/v1/services/{service_id}/env-vars',
-    headers=headers, json=env_vars
+# Push token to Render (correct format: list of key/value dicts)
+r = requests.put(
+    f'https://api.render.com/v1/services/{RENDER_SERVICE_ID}/env-vars',
+    headers=headers,
+    json=[{'key': 'NUBRA_SESSION_TOKEN', 'value': token}],
+    timeout=15
 )
-if r2.status_code in (200, 201):
+if r.status_code in (200, 201):
     print('✓ Token pushed to Render')
 else:
-    print(f'✗ Failed: {r2.status_code} {r2.text[:100]}')
+    print(f'ERROR: {r.status_code} {r.text[:200]}')
     sys.exit(1)
-" 2>&1 | tee -a "$LOG"
 
-    # Trigger redeploy
-    echo "[$(date)] Triggering Render redeploy..." | tee -a "$LOG"
-    curl -s -X POST \
-        -H "Authorization: Bearer $RENDER_API_KEY" \
-        -H "Accept: application/json" \
-        "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
-        -d '{"clearCache": false}' | "$PYTHON" -c "
-import json,sys
-d=json.load(sys.stdin)
-print('Deploy ID:', d.get('id','?'), '| Status:', d.get('status','?'))
-" 2>&1 | tee -a "$LOG"
-
-else
-    echo "[$(date)] No RENDER_API_KEY/SERVICE_ID — skipping Render push" | tee -a "$LOG"
-    echo "Set these in .env:"
-    echo "  RENDER_API_KEY=rnd_xxxx"
-    echo "  RENDER_SERVICE_ID=srv-xxxx"
-fi
-
-echo "[$(date)] Done." | tee -a "$LOG"
+# Trigger redeploy
+r2 = requests.post(
+    f'https://api.render.com/v1/services/{RENDER_SERVICE_ID}/deploys',
+    headers=headers, json={}, timeout=15
+)
+d = r2.json()
+print(f'✓ Redeploy: {r2.status_code} id={d.get("id","?")} status={d.get("status","?")}')
+print('Done.')
+PYEOF

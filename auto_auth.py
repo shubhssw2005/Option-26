@@ -124,25 +124,41 @@ def _push_token_to_render(token: str):
 
 
 def _client_from_token(env, token: str):
-    """Create SDK client from pre-existing session token."""
+    """Create SDK client — updates class-level HEADERS so all API calls use new token."""
     from nubra_python_sdk.start_sdk import InitNubraSdk
 
+    device = get_device_id()
+
+    # Write to shelve
+    try:
+        with shelve.open("auth_data.db", flag="c", writeback=True) as db:
+            db["session_token"] = token
+            db["auth_token"]    = token
+            if device and device != "TS123":
+                db["x-device-id"] = device
+    except Exception as e:
+        logger.warning(f"[auth] Shelve write: {e}")
+
+    # CRITICAL: update class-level HEADERS — BaseHttpClient reads these
+    InitNubraSdk.HEADERS["Authorization"] = f"Bearer {token}"
+    InitNubraSdk.HEADERS["x-device-id"]   = device
+    InitNubraSdk.HEADERS["x-app-version"] = "1.0.0"
+    InitNubraSdk.HEADERS["x-device-os"]   = "sdk"
+    InitNubraSdk.HEADERS["Cookie"]        = f"deviceId={device}"
+    logger.info("[auth] HEADERS updated with new token")
+
     nubra = object.__new__(InitNubraSdk)
-    nubra.env = env
-    nubra.totp_login = False
-    nubra.db_path = "auth_data.db"
+    nubra.env            = env
+    nubra.totp_login     = False
+    nubra.db_path        = "auth_data.db"
     nubra.env_path_login = False
-    nubra.token_data = {
-        "session_token": token,
-        "auth_token": token,
-        "x-device-id": get_device_id(),
-    }
-    nubra.API_BASE_URL = "https://api.nubra.io"
-    nubra.BEARER_TOKEN = token
+    nubra.token_data     = {"session_token": token, "auth_token": token, "x-device-id": device}
+    nubra.API_BASE_URL   = "https://api.nubra.io"
+    nubra.BEARER_TOKEN   = token
 
     def _auth_flow():
-        logger.info("[auth] auth_flow called on token client")
-
+        InitNubraSdk.HEADERS["Authorization"] = f"Bearer {token}"
+        logger.info("[auth] auth_flow — re-injected token")
     nubra.auth_flow = _auth_flow
     return nubra
 
