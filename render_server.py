@@ -222,7 +222,7 @@ async def lifespan(_app: FastAPI):
         from auto_auth import get_authenticated_client, _token_cache
 
         logger.info("[server] Authenticating...")
-        nubra = get_authenticated_client(state)
+        nubra = get_authenticated_client()
         if nubra:
             state["nubra"] = nubra
             md = MarketData(nubra)
