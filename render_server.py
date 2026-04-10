@@ -25,29 +25,35 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
-IS_RENDER = os.getenv("RENDER", "") == "true"
-DB_PATH = "/tmp/data.db" if IS_RENDER else "data.db"
+IS_RENDER  = os.getenv("RENDER", "") == "true"
+DB_PATH    = "/tmp/data.db"        if IS_RENDER else "data.db"
 MODELS_DIR = "/tmp/trained_models" if IS_RENDER else "trained_models"
-IST = pytz.timezone("Asia/Kolkata")
+IST        = pytz.timezone("Asia/Kolkata")
 
 os.makedirs(MODELS_DIR, exist_ok=True)
-os.environ["DB_PATH"] = DB_PATH
+os.environ["DB_PATH"]    = DB_PATH
 os.environ["MODELS_DIR"] = MODELS_DIR
 
-from models.vol_models import (
-    fit_garch,
-    fit_egarch,
-    fit_gjr_garch,
-    fit_sarima,
-    realized_vol,
-)
-from models.strategy_engine import (
-    score_strategies,
-    classify_regime,
-    STRATEGY_CATALOG,
-    liquidity_score,
-)
-from realtime_model import generate_signals, generate_all_signals
+# Lazy imports — heavy ML libs loaded on first use to avoid slow startup
+_lazy = {}
+
+def _vol():
+    if "vol" not in _lazy:
+        from models.vol_models import fit_garch, realized_vol
+        _lazy["vol"] = (fit_garch, realized_vol)
+    return _lazy["vol"]
+
+def _strategy():
+    if "strategy" not in _lazy:
+        from models.strategy_engine import score_strategies, classify_regime, STRATEGY_CATALOG, liquidity_score
+        _lazy["strategy"] = (score_strategies, classify_regime, STRATEGY_CATALOG, liquidity_score)
+    return _lazy["strategy"]
+
+def _signals():
+    if "signals" not in _lazy:
+        from realtime_model import generate_signals, generate_all_signals
+        _lazy["signals"] = (generate_signals, generate_all_signals)
+    return _lazy["signals"]
 
 # ── Shared state ──────────────────────────────────────────────────────────────
 state = {
@@ -356,7 +362,7 @@ def vol_forecast(
         rv20 = realized_vol(prices, 20)
         rv5 = realized_vol(prices, 5)
         try:
-            sar = fit_sarima(prices)
+            sar = {"forecast": [], "model": "disabled"}  # too slow on Render
         except Exception:
             sar = {"forecast": [], "model": ""}
 
@@ -474,6 +480,7 @@ def option_chain(
 @app.get("/signals")
 def signals(asset: str = Query("NIFTY")):
     try:
+        generate_signals, _ = _signals()
         return generate_signals(asset)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
@@ -483,6 +490,7 @@ def signals(asset: str = Query("NIFTY")):
 
 @app.get("/signals/all")
 def signals_all():
+    _, generate_all_signals = _signals()
     return generate_all_signals()
 
 
@@ -518,6 +526,7 @@ def strategy_recommend(
             iv_rank = 50.0
 
         try:
+            generate_signals, _ = _signals()
             sigs = generate_signals(asset)
             ce_score = (
                 float(sigs.get("CE", [{}])[0].get("signal_score", 0.5))
@@ -549,6 +558,7 @@ def strategy_recommend(
             else 0.0
         )
 
+        score_strategies, classify_regime, STRATEGY_CATALOG, liquidity_score = _strategy()
         regime = classify_regime(spot_ret5, spot_ret20, 25.0, iv_rank, 1.0, 1.5)
 
         df_chain = query_df(
@@ -623,6 +633,7 @@ def strategy_recommend(
 
 @app.get("/strategy-details/{strategy_key}")
 def strategy_details(strategy_key: str, asset: str = Query("NIFTY")):
+    _, _, STRATEGY_CATALOG, _ = _strategy()
     s = STRATEGY_CATALOG.get(strategy_key)
     if not s:
         raise HTTPException(404, f"Unknown: {strategy_key}")
