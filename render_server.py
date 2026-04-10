@@ -32,13 +32,10 @@ logger = logging.getLogger(__name__)
 IS_RENDER = os.getenv("RENDER", "") == "true"
 
 def _safe_path(env_key, tmp_path, local_path):
-    """Get path, but never use /data (no disk on free tier)."""
-    val = os.getenv(env_key, "")
+    """Get path. On Render always use /tmp regardless of env var."""
     if IS_RENDER:
-        # Reject /data paths (old disk config) and empty values
-        if not val or val.startswith("/data"):
-            return tmp_path
-        return val
+        return tmp_path   # always /tmp on free tier, ignore env var
+    val = os.getenv(env_key, "")
     return val or local_path
 
 DB_PATH    = _safe_path("DB_PATH",    "/tmp/data.db",        "data.db")
