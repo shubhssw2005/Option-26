@@ -31,14 +31,16 @@ logger = logging.getLogger(__name__)
 # ── Config ────────────────────────────────────────────────────────────────────
 IS_RENDER = os.getenv("RENDER", "") == "true"
 
+
 def _safe_path(env_key, tmp_path, local_path):
     """Get path. On Render always use /tmp regardless of env var."""
     if IS_RENDER:
-        return tmp_path   # always /tmp on free tier, ignore env var
+        return tmp_path  # always /tmp on free tier, ignore env var
     val = os.getenv(env_key, "")
     return val or local_path
 
-DB_PATH    = _safe_path("DB_PATH",    "/tmp/data.db",        "data.db")
+
+DB_PATH = _safe_path("DB_PATH", "/tmp/data.db", "data.db")
 MODELS_DIR = _safe_path("MODELS_DIR", "/tmp/trained_models", "trained_models")
 NETLIFY_URL = os.getenv("NETLIFY_URL", "*")
 IST = pytz.timezone("Asia/Kolkata")
@@ -87,6 +89,22 @@ def market_status() -> str:
     if "15:30" < t <= "18:00":
         return "post_market"
     return "closed"
+
+
+# ── Keep-alive pinger (prevents Render free tier sleep) ──────────────────────
+def _keep_alive():
+    """Ping self every 14 minutes to prevent Render free tier spin-down."""
+    import urllib.request
+
+    time.sleep(60)  # wait for server to fully start
+    while True:
+        try:
+            port = os.getenv("PORT", "10000")
+            urllib.request.urlopen(f"http://localhost:{port}/health", timeout=5)
+            logger.debug("[keepalive] ping OK")
+        except Exception:
+            pass
+        time.sleep(840)  # 14 minutes
 
 
 # ── Background scheduler ──────────────────────────────────────────────────────
@@ -228,8 +246,9 @@ async def lifespan(_app: FastAPI):
                     socket.connect()
                     time.sleep(2)
                     socket.subscribe(
-                        ["NIFTY","BANKNIFTY","FINNIFTY","MIDCPNIFTY"],
-                        data_type="index", exchange="NSE",
+                        ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"],
+                        data_type="index",
+                        exchange="NSE",
                     )
                     socket.keep_running()
                 except Exception as e:
@@ -237,13 +256,17 @@ async def lifespan(_app: FastAPI):
 
             threading.Thread(target=_run_ws, daemon=True).start()
             threading.Thread(target=_background_scheduler, daemon=True).start()
+            threading.Thread(target=_keep_alive, daemon=True).start()
 
             def _initial_load():
                 time.sleep(5)
                 try:
                     from collect_data import init_db, collect_historical
+
                     conn = init_db(DB_PATH)
-                    count = conn.execute("SELECT COUNT(*) FROM historical_candle").fetchone()[0]
+                    count = conn.execute(
+                        "SELECT COUNT(*) FROM historical_candle"
+                    ).fetchone()[0]
                     if count < 10:
                         logger.info("[startup] DB empty — fetching historical data...")
                         collect_historical(state["market_data"], conn)
@@ -263,9 +286,10 @@ async def lifespan(_app: FastAPI):
     logger.info("[server] Ready")
     yield
     if state.get("socket"):
-        try: state["socket"].disconnect()
-        except Exception: pass
-
+        try:
+            state["socket"].disconnect()
+        except Exception:
+            pass
 
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
@@ -383,30 +407,42 @@ def vol_forecast(
             try:
                 from datetime import datetime, timedelta, timezone
                 import pandas as pd
-                end_dt   = datetime.now(timezone.utc)
+
+                end_dt = datetime.now(timezone.utc)
                 start_dt = end_dt - timedelta(days=90)
-                hist = state["market_data"].historical_data({
-                    "exchange": exchange, "type": "INDEX", "values": [symbol],
-                    "fields": ["close"], "interval": interval,
-                    "startDate": start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                    "endDate":   end_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                    "intraDay": False, "realTime": False,
-                })
+                hist = state["market_data"].historical_data(
+                    {
+                        "exchange": exchange,
+                        "type": "INDEX",
+                        "values": [symbol],
+                        "fields": ["close"],
+                        "interval": interval,
+                        "startDate": start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                        "endDate": end_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                        "intraDay": False,
+                        "realTime": False,
+                    }
+                )
                 sym_data = hist.result[0].values[0].get(symbol)
                 if sym_data and sym_data.close:
-                    df = pd.DataFrame([
-                        {"ts": p.timestamp, "close": (p.value or 0) / 100}
-                        for p in sym_data.close
-                    ])
+                    df = pd.DataFrame(
+                        [
+                            {"ts": p.timestamp, "close": (p.value or 0) / 100}
+                            for p in sym_data.close
+                        ]
+                    )
                     # Save to DB for future use
                     try:
                         from collect_data import init_db, save_index_candles
+
                         conn = init_db(DB_PATH)
                         save_index_candles(conn, hist, symbol, exchange, interval)
                         conn.close()
                     except Exception:
                         pass
-                    logger.info(f"vol-forecast: fetched {len(df)} candles live for {symbol}")
+                    logger.info(
+                        f"vol-forecast: fetched {len(df)} candles live for {symbol}"
+                    )
             except Exception as e:
                 logger.warning(f"vol-forecast live fetch: {e}")
 
@@ -657,12 +693,21 @@ def historical(
         raise HTTPException(503, "SDK not ready — authentication in progress")
     if end is None:
         end = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
     def _do_fetch():
-        return md.historical_data({
-            "exchange": exchange, "type": itype, "values": [symbol],
-            "fields": fields.split(","), "startDate": start, "endDate": end,
-            "interval": interval, "intraDay": False, "realTime": False,
-        })
+        return md.historical_data(
+            {
+                "exchange": exchange,
+                "type": itype,
+                "values": [symbol],
+                "fields": fields.split(","),
+                "startDate": start,
+                "endDate": end,
+                "interval": interval,
+                "intraDay": False,
+                "realTime": False,
+            }
+        )
 
     try:
         resp = _do_fetch()
@@ -680,32 +725,34 @@ def historical(
     # Convert SDK response to JSON-serializable format
     try:
         result = []
-        for chart_data in (resp.result or []):
+        for chart_data in resp.result or []:
             values_list = []
-            for sym_dict in (chart_data.values or []):
+            for sym_dict in chart_data.values or []:
                 sym_entry = {}
                 for sym_name, stock_chart in sym_dict.items():
                     sym_entry[sym_name] = {}
                     for field in fields.split(","):
                         pts = getattr(stock_chart, field, None) or []
                         sym_entry[sym_name][field] = [
-                            {"timestamp": p.timestamp, "value": p.value}
-                            for p in pts
+                            {"timestamp": p.timestamp, "value": p.value} for p in pts
                         ]
                 values_list.append(sym_entry)
-            result.append({
-                "exchange": chart_data.exchange,
-                "type":     chart_data.type,
-                "values":   values_list,
-            })
+            result.append(
+                {
+                    "exchange": chart_data.exchange,
+                    "type": chart_data.type,
+                    "values": values_list,
+                }
+            )
         return {
             "market_time": str(resp.market_time) if resp.market_time else None,
-            "message":     resp.message,
-            "result":      result,
+            "message": resp.message,
+            "result": result,
         }
     except Exception as e:
         logger.error(f"historical serialization error: {e}")
         raise HTTPException(500, str(e)) from e
+
 
 @app.get("/iv-surface")
 def iv_surface_endpoint(asset: str = Query("NIFTY")):

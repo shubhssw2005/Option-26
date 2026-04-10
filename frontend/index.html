@@ -917,8 +917,25 @@
                     <div class="market-closed-msg" style="display:none;color:#888;font-size:.78rem;padding:8px 0">
                         ○ Market closed — live Greeks stream inactive. Opens 09:15 IST.
                     </div>
-                    <table><thead><tr><th>Inst ID</th><th>LTP</th><th>IV%</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>OI</th></tr></thead>
-                    <tbody id="live-greeks-table"><tr><td colspan="8" style="color:#999">Waiting for WebSocket data…</td></tr></tbody></table>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Inst ID</th>
+                                <th>LTP</th>
+                                <th>IV%</th>
+                                <th>Delta</th>
+                                <th>Gamma</th>
+                                <th>Theta</th>
+                                <th>Vega</th>
+                                <th>OI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="live-greeks-table">
+                            <tr>
+                                <td colspan="8" style="color:#999">Waiting for WebSocket data…</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <!-- ── HISTORICAL ── -->
@@ -955,24 +972,49 @@
         </div>
     </div>
 
+
     <script>
         'use strict';
+
+        // ── Config ────────────────────────────────────────────────────────────────────
         const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:8000'
-  : 'https://option-26.onrender.com';
-        let charts = {}, refreshTimers = {}, lastData = {};
+            ? 'http://localhost:8000'
+            : 'https://option-26.onrender.com';
 
-        // ── Utilities ─────────────────────────────────────────────────────────────────
-        const fmt = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) : '—';
-        const fmtN = (v) => v != null ? Number(v).toLocaleString('en-IN') : '—';
-        const fmtP = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) + '%' : '—';
-        const clr = (v) => v > 0 ? 'up' : v < 0 ? 'down' : 'neutral';
+        const TIMEOUT_MS = 45000; // 45s — handles Render cold start
+        let charts = {}, mktStatus = 'unknown', serverReady = false;
 
-        async function api(path) {
-            const r = await fetch(API + path);
-            if (!r.ok) throw new Error(`${r.status} ${path}`);
-            return r.json();
+        // ── Core fetch with timeout + retry ──────────────────────────────────────────
+        async function apiFetch(path, retries = 2) {
+            for (let i = 0; i <= retries; i++) {
+                const ctrl = new AbortController();
+                const tid = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+                try {
+                    const r = await fetch(API + path, { signal: ctrl.signal });
+                    clearTimeout(tid);
+                    if (!r.ok) throw new Error(`${r.status} ${path}`);
+                    return await r.json();
+                } catch (e) {
+                    clearTimeout(tid);
+                    if (i === retries) throw e;
+                    await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
+                }
+            }
         }
+
+        // ── Loading helpers ───────────────────────────────────────────────────────────
+        function loading(el, msg = 'Loading…') {
+            if (typeof el === 'string') el = document.getElementById(el);
+            if (el) el.innerHTML = `<div style="color:#888;font-size:.8rem;padding:12px 0">${msg}</div>`;
+        }
+        function err(el, msg) {
+            if (typeof el === 'string') el = document.getElementById(el);
+            if (el) el.innerHTML = `<div style="color:#c0392b;font-size:.78rem;padding:8px 0">⚠ ${msg}</div>`;
+        }
+        const fmt = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) : '—';
+        const fmtN = v => v != null ? Number(v).toLocaleString('en-IN') : '—';
+        const fmtP = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) + '%' : '—';
+        const clr = v => v > 0 ? 'up' : v < 0 ? 'down' : 'neutral';
 
         // ── Navigation ────────────────────────────────────────────────────────────────
         function show(page) {
@@ -982,54 +1024,47 @@
             document.querySelectorAll('.nav-item').forEach(n => {
                 if (n.getAttribute('onclick')?.includes("'" + page + "'")) n.classList.add('active');
             });
-            const loaders = { vol: 'loadVol', greeks: 'loadGreeks', history: 'loadHistory', signals: 'loadSignals', strategy: 'loadStrategy' };
-            if (loaders[page]) window[loaders[page]]?.();
+            const map = { vol: 'loadVol', greeks: 'loadGreeks', history: 'loadHistory', signals: 'loadSignals', strategy: 'loadStrategy' };
+            if (map[page]) window[map[page]]?.();
         }
 
-        // ── Clock + market status ─────────────────────────────────────────────────────
+        // ── Clock ─────────────────────────────────────────────────────────────────────
         setInterval(() => {
             document.getElementById('htime').textContent = new Date().toLocaleTimeString('en-IN', { hour12: false });
         }, 1000);
 
-        let mktStatus = 'unknown';
+        // ── Server wake-up + health ───────────────────────────────────────────────────
         async function checkHealth() {
+            const b = document.getElementById('mkt-badge');
+            const s = document.getElementById('hstatus');
             try {
-                const d = await api('/health');
+                const d = await apiFetch('/health');
                 mktStatus = d.market_status || 'unknown';
-                const b = document.getElementById('mkt-badge');
+                serverReady = d.authenticated === true;
                 b.textContent = mktStatus === 'open' ? '● MARKET OPEN' : mktStatus === 'post_market' ? '◐ POST-MARKET' : '○ MARKET CLOSED';
                 b.className = 'hbadge' + (mktStatus === 'open' ? ' live' : '');
-                b.title = d.note || '';
-                document.getElementById('hstatus').textContent = d.ist_time || '';
-                // Show/hide live-only panels
-                document.querySelectorAll('.live-only').forEach(el => {
-                    el.style.opacity = mktStatus === 'open' ? '1' : '0.5';
-                });
-                document.querySelectorAll('.market-closed-msg').forEach(el => {
-                    el.style.display = mktStatus === 'open' ? 'none' : 'block';
-                });
-            } catch (e) { }
+                s.textContent = d.ist_time || '';
+                if (!serverReady) s.textContent += ' (auth pending)';
+            } catch (e) {
+                b.textContent = '○ Waking up…';
+                b.className = 'hbadge';
+                s.textContent = 'Server starting (30s)…';
+            }
         }
         setInterval(checkHealth, 30000);
-        checkHealth();
 
-        // ── WebSocket live ticks ──────────────────────────────────────────────────────
+        // ── WebSocket ─────────────────────────────────────────────────────────────────
         function connectWS() {
             const badge = document.getElementById('ws-badge');
-            const wsUrl = API.replace('https://','wss://').replace('http://','ws://') + '/ws/live';
-  const ws = new WebSocket(wsUrl);
+            const wsUrl = API.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/live';
+            const ws = new WebSocket(wsUrl);
             ws.onopen = () => { badge.textContent = '● WS'; badge.className = 'hbadge live'; };
-            ws.onclose = () => { badge.textContent = '○ WS'; badge.className = 'hbadge'; setTimeout(connectWS, 3000); };
+            ws.onclose = () => { badge.textContent = '○ WS'; badge.className = 'hbadge'; setTimeout(connectWS, 5000); };
             ws.onerror = () => { badge.textContent = '✗ WS'; badge.className = 'hbadge'; };
             ws.onmessage = e => {
                 try {
                     const d = JSON.parse(e.data);
-                    lastData.indexes = d.indexes || [];
-                    lastData.greeks = d.greeks || [];
-                    renderLiveIndexes(lastData.indexes);
-                    if (document.getElementById('page-greeks')?.classList.contains('active')) {
-                        renderLiveGreeks(lastData.greeks);
-                    }
+                    if (d.indexes?.length) renderLiveIndexes(d.indexes);
                 } catch (ex) { }
             };
         }
@@ -1037,48 +1072,16 @@
         function renderLiveIndexes(indexes) {
             const el = document.getElementById('index-list');
             if (!el) return;
-            if (!indexes.length) {
-                el.innerHTML = `<div class="market-closed-msg" style="color:#888;font-size:.8rem;padding:12px 0">
-      Market closed — showing last available data</div>`;
-                loadLastIndexData();
-                return;
-            }
             el.innerHTML = indexes.map(i => {
                 const val = (i.index_value / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
                 const chg = (i.changepercent || 0).toFixed(2);
-                const cls = chg >= 0 ? 'up' : 'down';
                 return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">
       <span style="font-weight:600">${i.indexname}</span>
       <div style="text-align:right">
         <div style="font-size:1rem;font-weight:700">${val}</div>
-        <div class="${cls}" style="font-size:.72rem">${chg >= 0 ? '+' : ''}${chg}%</div>
+        <div class="${clr(chg)}" style="font-size:.72rem">${chg >= 0 ? '+' : ''}${chg}%</div>
       </div></div>`;
             }).join('');
-        }
-
-        async function loadLastIndexData() {
-            // When market closed, show last candle prices
-            try {
-                const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'];
-                const rows = await Promise.all(assets.map(async a => {
-                    const d = await api(`/historical?symbol=${a}&interval=1d&start=2025-01-01T00:00:00.000Z&fields=close`);
-                    const closes = d.result?.[0]?.values?.[0]?.[a]?.close || [];
-                    if (!closes.length) return null;
-                    const last = closes[closes.length - 1];
-                    const prev = closes.length > 1 ? closes[closes.length - 2] : last;
-                    const chg = ((last.v - prev.v) / prev.v * 100).toFixed(2);
-                    return { name: a, val: (last.v / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 }), chg };
-                }));
-                const el = document.getElementById('index-list');
-                el.innerHTML = `<div style="font-size:.65rem;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Last Close</div>` +
-                    rows.filter(Boolean).map(r => `
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">
-          <span style="font-weight:600">${r.name}</span>
-          <div style="text-align:right">
-            <div style="font-size:1rem;font-weight:700">${r.val}</div>
-            <div class="${r.chg >= 0 ? 'up' : 'down'}" style="font-size:.72rem">${r.chg >= 0 ? '+' : ''}${r.chg}%</div>
-          </div></div>`).join('');
-            } catch (e) { }
         }
 
         // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -1086,37 +1089,41 @@
             const asset = document.getElementById('dash-asset')?.value || 'NIFTY';
             const dte = document.getElementById('dash-dte')?.value || '7';
 
-            // KPIs from vol forecast
+            loading('kpi-row', 'Loading volatility data…');
+            loading('vol-regime-list', 'Loading…');
+            loading('top-strategies', 'Loading strategy recommendations…');
+
+            // Vol KPIs
             try {
-                const vf = await api(`/vol-forecast?symbol=${asset}`);
+                const vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
                 const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
                 const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
+                const ivpColor = (vf.iv_percentile || 50) > 70 ? '#c0392b' : (vf.iv_percentile || 50) < 30 ? '#1a7a3c' : '#b8860b';
                 document.getElementById('kpi-row').innerHTML = [
                     { label: 'GARCH 1d Vol', value: v1d + '%', sub: 'Ann: ' + vann + '%', color: parseFloat(v1d) > 2.5 ? '#c0392b' : '#111' },
                     { label: 'Realized 20d', value: fmtP(vf.realized_vol_20d), sub: '5d: ' + fmtP(vf.realized_vol_5d), color: '#111' },
-                    { label: 'IV Percentile', value: fmtP(vf.iv_percentile), sub: 'Regime: ' + (vf.vol_regime || '—'), color: (vf.iv_percentile || 50) > 70 ? '#c0392b' : (vf.iv_percentile || 50) < 30 ? '#1a7a3c' : '#b8860b' },
+                    { label: 'IV Percentile', value: fmtP(vf.iv_percentile), sub: 'Regime: ' + (vf.vol_regime || '—'), color: ivpColor },
                     { label: 'Vol Risk Prem', value: fmtP(vf.vol_risk_premium), sub: 'PCR: ' + (vf.pcr || '—'), color: (vf.vol_risk_premium || 0) > 0 ? '#c0392b' : '#1a7a3c' },
-                ].map(k => `<div class="kpi">
-      <div class="kpi-label">${k.label}</div>
+                ].map(k => `<div class="kpi"><div class="kpi-label">${k.label}</div>
       <div class="kpi-value" style="color:${k.color}">${k.value}</div>
       <div class="kpi-sub">${k.sub}</div></div>`).join('');
-            } catch (e) { }
+            } catch (e) { err('kpi-row', 'Vol data unavailable: ' + e.message); }
 
             // Vol regimes all assets
             loadVolRegimes();
 
             // Strategy
             try {
-                const d = await api(`/strategy-recommend?asset=${asset}&dte=${dte}`);
+                const d = await apiFetch(`/strategy-recommend?asset=${asset}&dte=${dte}`);
                 renderTopStrategies(d.top_recommendations || [], d);
-            } catch (e) { }
+            } catch (e) { err('top-strategies', 'Strategy data unavailable: ' + e.message); }
         }
 
         async function loadVolRegimes() {
             const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
             const el = document.getElementById('vol-regime-list');
-            el.innerHTML = '<div style="color:#999;font-size:.75rem">Loading…</div>';
-            const results = await Promise.allSettled(assets.map(a => api(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
+            loading(el, 'Loading vol regimes…');
+            const results = await Promise.allSettled(assets.map(a => apiFetch(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
             el.innerHTML = results.map(r => {
                 if (r.status !== 'fulfilled') return '';
                 const [asset, vf] = r.value;
@@ -1138,7 +1145,7 @@
 
         function renderTopStrategies(strategies, data) {
             const el = document.getElementById('top-strategies');
-            if (!strategies.length) { el.innerHTML = '<p style="color:#999;font-size:.8rem">No recommendations</p>'; return; }
+            if (!strategies.length) { el.innerHTML = '<p style="color:#999;font-size:.8rem">No recommendations available</p>'; return; }
             const cond = data.condition_analysis || {};
             el.innerHTML = `<div style="padding:8px;background:#f8f8f8;border-radius:2px;font-size:.73rem;margin-bottom:10px">
     <strong>${data.regime || '—'}</strong> &nbsp;|&nbsp; ${cond.trend || '—'} &nbsp;|&nbsp; ${cond.volatility_environment || '—'}<br>
@@ -1152,7 +1159,7 @@
       <div class="strat-name">${s.name}</div>
       <div class="strat-meta">
         <span class="tag tag-grey">${s.category || '—'}</span>
-        <span class="tag tag-${tf === 'bullish' ? 'green' : tf === 'bearish' ? 'red' : 'blue'}">${tf}</span>
+        <span class="tag tag-${tf.includes('bull') ? 'green' : tf.includes('bear') ? 'red' : 'blue'}">${tf}</span>
       </div>
       <div style="font-size:.71rem;color:#555;margin-bottom:6px">${s.best_for || s.description || '—'}</div>
       <button class="outline" style="font-size:.68rem" onclick="calcStrikes('${s.strategy_key}')">Details →</button>
@@ -1166,30 +1173,27 @@
             const exc = document.getElementById('oc-exchange').value;
             const exp = document.getElementById('oc-expiry').value;
             if (!exp) { alert('Enter expiry YYYYMMDD'); return; }
+            loading('ce-table', ''); loading('pe-table', '');
             try {
-                const d = await api(`/option-chain?instrument=${sym}&exchange=${exc}&expiry=${exp}`);
+                const d = await apiFetch(`/option-chain?instrument=${sym}&exchange=${exc}&expiry=${exp}`);
                 const chain = d.chain || {};
                 const atm = chain.atm ? chain.atm / 100 : null;
                 document.getElementById('atm-info').textContent =
-                    atm ? `ATM: ${atm.toLocaleString('en-IN')}  |  Spot: ${(chain.cp / 100).toLocaleString('en-IN')}  |  Expiry: ${exp}` : '';
+                    atm ? `ATM: ${atm.toLocaleString('en-IN')}  |  Spot: ${(chain.cp / 100).toLocaleString('en-IN')}` : '';
                 renderChainTable('ce-table', chain.ce || [], atm);
                 renderChainTable('pe-table', chain.pe || [], atm);
-            } catch (e) { alert('Error: ' + e.message); }
+            } catch (e) { err('ce-table', e.message); }
         }
 
         function renderChainTable(id, items, atm) {
             document.getElementById(id).innerHTML = [...items]
-                .sort((a, b) => (a.sp || 0) - (b.sp || 0))
-                .slice(0, 30).map(i => {
-                    const strike = (i.sp / 100).toFixed(0);
+                .sort((a, b) => (a.sp || 0) - (b.sp || 0)).slice(0, 30).map(i => {
                     const isAtm = atm && Math.abs(i.sp / 100 - atm) < 50;
-                    const ltp = i.ltp != null ? (i.ltp / 100).toFixed(2) : '—';
-                    const iv = i.iv != null ? (i.iv * 100).toFixed(1) : '—';
                     const ivColor = i.iv > 0.3 ? '#c0392b' : i.iv > 0.2 ? '#b8860b' : '#1a7a3c';
                     return `<tr class="${isAtm ? 'atm-row' : ''}">
-        <td><strong>${Number(strike).toLocaleString('en-IN')}</strong></td>
-        <td>${ltp}</td>
-        <td style="color:${ivColor}">${iv}</td>
+        <td><strong>${(i.sp / 100).toLocaleString('en-IN')}</strong></td>
+        <td>${i.ltp != null ? (i.ltp / 100).toFixed(2) : '—'}</td>
+        <td style="color:${ivColor}">${i.iv != null ? (i.iv * 100).toFixed(1) : '—'}</td>
         <td class="${clr(i.delta)}">${fmt(i.delta, 3)}</td>
         <td>${fmt(i.gamma, 5)}</td>
         <td class="${clr(i.theta)}">${fmt(i.theta, 2)}</td>
@@ -1203,12 +1207,15 @@
         // ── Volatility ────────────────────────────────────────────────────────────────
         async function loadVol() {
             const asset = document.getElementById('vol-asset')?.value || 'NIFTY';
+            loading('vol-kpis', 'Loading…');
+            loading('sarima-result', 'Loading SARIMA forecast…');
+            loading('vol-all-table', '');
+
             try {
-                const vf = await api(`/vol-forecast?symbol=${asset}`);
+                const vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
                 const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || 0;
                 const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || 0;
 
-                // KPI tiles
                 document.getElementById('vol-kpis').innerHTML = [
                     { label: 'GARCH 1d', value: v1d + '%', sub: 'Ann: ' + vann + '%', color: parseFloat(v1d) > 2.5 ? '#c0392b' : '#111' },
                     { label: 'Realized 20d', value: fmtP(vf.realized_vol_20d), sub: '5d: ' + fmtP(vf.realized_vol_5d), color: '#111' },
@@ -1218,111 +1225,103 @@
       <div class="kpi-value" style="color:${k.color}">${k.value}</div>
       <div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-                // GARCH model comparison
+                // GARCH chart
                 const models = vf.models || {};
                 const mNames = Object.keys(models);
                 const mVols = mNames.map(m => models[m].vol_1d || 0);
                 const mAics = mNames.map(m => models[m].aic || 0);
                 const bestIdx = mAics.indexOf(Math.min(...mAics));
-                const ctx1 = document.getElementById('garch-chart').getContext('2d');
-                if (charts.garch) charts.garch.destroy();
-                charts.garch = new Chart(ctx1, {
-                    type: 'bar',
-                    data: {
-                        labels: mNames,
-                        datasets: [
-                            { label: '1-Day Vol%', data: mVols, backgroundColor: mNames.map((_, i) => i === bestIdx ? '#111' : '#aaa'), borderRadius: 2 },
-                        ]
-                    },
-                    options: {
-                        animation: false, plugins: {
-                            legend: { display: false },
-                            tooltip: { callbacks: { afterLabel: (c) => `AIC: ${mAics[c.dataIndex].toFixed(1)}` } }
+                const ctx1 = document.getElementById('garch-chart')?.getContext('2d');
+                if (ctx1) {
+                    if (charts.garch) charts.garch.destroy();
+                    charts.garch = new Chart(ctx1, {
+                        type: 'bar',
+                        data: {
+                            labels: mNames, datasets: [{
+                                label: '1-Day Vol%', data: mVols,
+                                backgroundColor: mNames.map((_, i) => i === bestIdx ? '#111' : '#aaa'), borderRadius: 2
+                            }]
                         },
-                        scales: { x: { ticks: { color: '#555' } }, y: { ticks: { color: '#555' }, title: { display: true, text: 'Vol %' } } }
-                    }
-                });
-
-                // 5-day forecast
-                const sarima = vf.sarima_forecast || [];
-                const ctx2 = document.getElementById('forecast-chart').getContext('2d');
-                if (charts.forecast) charts.forecast.destroy();
-                charts.forecast = new Chart(ctx2, {
-                    type: 'line',
-                    data: {
-                        labels: ['D+1', 'D+2', 'D+3', 'D+4', 'D+5'],
-                        datasets: [{
-                            label: 'SARIMA Return%', data: sarima,
-                            borderColor: '#111', borderWidth: 2, pointRadius: 5,
-                            pointBackgroundColor: sarima.map(v => v >= 0 ? '#1a7a3c' : '#c0392b'), fill: false
-                        }]
-                    },
-                    options: {
-                        animation: false, plugins: { legend: { labels: { color: '#111' } } },
-                        scales: {
-                            x: { ticks: { color: '#555' } },
-                            y: {
-                                ticks: { color: '#555' }, grid: { color: '#f0f0f0' },
-                                title: { display: true, text: 'Return %' }
-                            }
+                        options: {
+                            animation: false, plugins: { legend: { display: false } },
+                            scales: { x: { ticks: { color: '#555' } }, y: { ticks: { color: '#555' }, title: { display: true, text: 'Vol %' } } }
                         }
-                    }
-                });
+                    });
+                }
 
-                // SARIMA info
+                // SARIMA
+                const sarima = vf.sarima_forecast || [];
+                const ctx2 = document.getElementById('forecast-chart')?.getContext('2d');
+                if (ctx2) {
+                    if (charts.forecast) charts.forecast.destroy();
+                    charts.forecast = new Chart(ctx2, {
+                        type: 'line',
+                        data: {
+                            labels: ['D+1', 'D+2', 'D+3', 'D+4', 'D+5'],
+                            datasets: [{
+                                label: 'SARIMA Return%', data: sarima,
+                                borderColor: '#111', borderWidth: 2, pointRadius: 5,
+                                pointBackgroundColor: sarima.map(v => v >= 0 ? '#1a7a3c' : '#c0392b'), fill: false
+                            }]
+                        },
+                        options: {
+                            animation: false, plugins: { legend: { labels: { color: '#111' } } },
+                            scales: { x: { ticks: { color: '#555' } }, y: { ticks: { color: '#555' } } }
+                        }
+                    });
+                }
+
                 document.getElementById('sarima-result').innerHTML = sarima.length
                     ? `<div style="font-size:.78rem;margin-bottom:8px">Model: <strong>${vf.sarima_model || '—'}</strong></div>
          <div style="display:flex;gap:10px">${sarima.map((v, i) =>
                         `<div class="kpi" style="flex:1"><div class="kpi-label">Day ${i + 1}</div>
             <div class="kpi-value ${v >= 0 ? 'up' : 'down'}" style="font-size:1rem">${v >= 0 ? '+' : ''}${v}%</div></div>`
                     ).join('')}</div>`
-                    : '<p style="color:#999;font-size:.8rem">No SARIMA forecast available</p>';
+                    : '<p style="color:#999;font-size:.8rem">No SARIMA forecast</p>';
 
-                // All assets table
-                loadVolAllTable();
-            } catch (e) { console.error('vol:', e); }
-        }
+            } catch (e) { err('vol-kpis', 'Vol forecast failed: ' + e.message); }
 
-        async function loadVolAllTable() {
+            // All assets table
             const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
-            const rows = await Promise.allSettled(assets.map(a => api(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
+            const rows = await Promise.allSettled(assets.map(a => apiFetch(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
             document.getElementById('vol-all-table').innerHTML = rows.map(r => {
-                if (r.status !== 'fulfilled') return '';
+                if (r.status !== 'fulfilled') return `<tr><td>${r.reason?.message?.includes('NIFTY') ? '?' : '?'}</td><td colspan="8" style="color:#999">Loading…</td></tr>`;
                 const [a, vf] = r.value;
                 const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
                 const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
                 const reg = vf.vol_regime || 'fair';
                 const rc = reg === 'cheap' ? 'tag-green' : reg === 'expensive' ? 'tag-red' : 'tag-gold';
-                const vrp = vf.vol_risk_premium || 0;
                 return `<tr>
       <td><strong>${a}</strong></td>
       <td>${v1d}</td><td>${vann}</td>
       <td>${fmtP(vf.realized_vol_20d)}</td>
       <td>${fmtP(vf.current_iv_pct)}</td>
       <td>${fmtP(vf.iv_percentile)}</td>
-      <td class="${vrp > 0 ? 'down' : 'up'}">${fmtP(vrp)}</td>
+      <td class="${(vf.vol_risk_premium || 0) > 0 ? 'down' : 'up'}">${fmtP(vf.vol_risk_premium)}</td>
       <td>${vf.pcr || '—'}</td>
       <td><span class="tag ${rc}">${reg}</span></td>
     </tr>`;
             }).join('');
         }
 
+        const fetchVol = loadVol;
+
         // ── Strategy ──────────────────────────────────────────────────────────────────
         async function loadStrategy() {
             const asset = document.getElementById('st-asset')?.value || 'NIFTY';
             const dte = document.getElementById('st-dte')?.value || '7';
+            loading('regime-display', '');
+            loading('strategy-list', 'Analysing market conditions…');
             try {
-                const d = await api(`/strategy-recommend?asset=${asset}&dte=${dte}`);
+                const d = await apiFetch(`/strategy-recommend?asset=${asset}&dte=${dte}`);
                 const cond = d.condition_analysis || {};
                 document.getElementById('regime-display').innerHTML = `
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <span class="regime-badge regime-${(d.regime || 'uncertain').replace(/_/g, '-')}">${d.regime || '—'}</span>
         <span style="font-size:.73rem">Trend: <strong>${cond.trend || '—'}</strong></span>
         <span style="font-size:.73rem">Vol: <strong>${cond.volatility_environment || '—'}</strong></span>
-        <span style="font-size:.73rem">IV: <strong>${cond.iv_status || '—'}</strong></span>
         <span style="font-size:.73rem">Spot Δ: <strong class="${clr(d.spot_change_pct)}">${fmt(d.spot_change_pct)}%</strong></span>
-        <span style="font-size:.73rem">IV Level: <strong>${fmt(d.iv_level)}%</strong></span>
-        <span style="font-size:.73rem">IV Rank: <strong>${fmt(d.iv_rank)}%</strong></span>
+        <span style="font-size:.73rem">IV: <strong>${fmt(d.iv_level)}%</strong></span>
       </div>
       <div style="font-size:.71rem;color:#555;padding:6px 8px;background:#f8f8f8;border-radius:2px">${cond.overall_outlook || ''}</div>`;
 
@@ -1336,7 +1335,7 @@
         <div class="strat-name">${s.name}</div>
         <div class="strat-meta">
           <span class="tag tag-grey">${s.category || '—'}</span>
-          <span class="tag tag-${tf === 'bullish' ? 'green' : tf === 'bearish' ? 'red' : 'blue'}">${tf}</span>
+          <span class="tag tag-${tf.includes('bull') ? 'green' : tf.includes('bear') ? 'red' : 'blue'}">${tf}</span>
           <span class="tag tag-grey">Rank #${s.rank || i + 1}</span>
         </div>
         <div style="font-size:.71rem;color:#555;margin-bottom:6px">
@@ -1346,49 +1345,53 @@
         <button class="outline" style="font-size:.68rem" onclick="calcStrikes('${s.strategy_key}','${asset}')">Details →</button>
       </div>`;
                 }).join('');
-            } catch (e) { console.error('strategy:', e); }
+            } catch (e) { err('strategy-list', 'Strategy failed: ' + e.message); }
         }
+
+        const fetchStrategy = loadStrategy;
 
         async function calcStrikes(stratKey, asset) {
             asset = asset || document.getElementById('st-asset')?.value || 'NIFTY';
             const card = document.getElementById('strike-calc-card');
             card.style.display = 'block';
+            loading('strike-result', 'Loading strategy details…');
             try {
-                const d = await api(`/strategy-details/${stratKey}?asset=${asset}`);
+                const d = await apiFetch(`/strategy-details/${stratKey}?asset=${asset}`);
                 document.getElementById('strike-result').innerHTML = `
-      <div style="margin-bottom:10px">
-        <strong style="font-size:.95rem">${d.name || stratKey}</strong>
-        <span class="tag tag-grey" style="margin-left:8px">${d.category || ''}</span>
-      </div>
+      <div style="margin-bottom:10px"><strong style="font-size:.95rem">${d.name || stratKey}</strong>
+        <span class="tag tag-grey" style="margin-left:8px">${d.category || ''}</span></div>
       <div style="font-size:.78rem;color:#555;line-height:1.9">
         <div>${d.description || ''}</div>
         <div><strong>Best for:</strong> ${d.best_for || '—'}</div>
         <div><strong>Risk:</strong> ${d.risk_profile || '—'}</div>
+        <div><strong>Max Profit:</strong> ${d.max_profit || '—'}</div>
+        <div><strong>Breakeven:</strong> ${d.breakeven || '—'}</div>
       </div>`;
-            } catch (e) {
-                document.getElementById('strike-result').innerHTML = `<p style="color:#c0392b">Error: ${e.message}</p>`;
-            }
+            } catch (e) { err('strike-result', e.message); }
             card.scrollIntoView({ behavior: 'smooth' });
         }
 
         // ── ML Signals ────────────────────────────────────────────────────────────────
         async function loadSignals() {
             const asset = document.getElementById('sig-asset')?.value || 'NIFTY';
+            loading('ce-signals', ''); loading('pe-signals', '');
             try {
-                const d = await api(`/signals?asset=${asset}`);
+                const d = await apiFetch(`/signals?asset=${asset}`);
                 renderSignalTable('ce-signals', d.CE || [], '#1a7a3c');
                 renderSignalTable('pe-signals', d.PE || [], '#c0392b');
-            } catch (e) { console.error('signals:', e); }
+            } catch (e) { err('ce-signals', e.message); err('pe-signals', ''); }
         }
 
+        const fetchSignals = loadSignals;
+
         function renderSignalTable(id, rows, color) {
+            if (!rows.length) { document.getElementById(id).innerHTML = '<tr><td colspan="6" style="color:#999">No signals</td></tr>'; return; }
             document.getElementById(id).innerHTML = rows.map(r => {
                 const score = r.signal_score || 0;
                 const bar = `<div style="display:flex;align-items:center;gap:5px">
       <div style="width:${Math.round(score * 60)}px;height:5px;background:${color};border-radius:3px;min-width:2px"></div>
       <span style="font-weight:700;font-size:.8rem">${(score * 100).toFixed(0)}</span></div>`;
-                // Strikes from live data are already divided by 100 in realtime_model
-                const strike = r.strike ? r.strike.toLocaleString('en-IN') : '—';
+                const strike = r.strike ? (r.strike / 100).toLocaleString('en-IN') : '—';
                 const ltp = r.ltp ? r.ltp.toFixed(2) : '—';
                 const iv = r.iv ? (r.iv * 100).toFixed(1) + '%' : '—';
                 return `<tr>
@@ -1400,35 +1403,35 @@
         }
 
         async function fetchAllSignals() {
+            const card = document.getElementById('all-signals-card');
+            card.style.display = 'block';
+            loading('all-signals-content', 'Loading all assets…');
             try {
-                const d = await api('/signals/all');
-                const card = document.getElementById('all-signals-card');
-                card.style.display = 'block';
+                const d = await apiFetch('/signals/all');
                 document.getElementById('all-signals-content').innerHTML = Object.entries(d).map(([asset, sigs]) => {
                     if (sigs.error) return `<div style="padding:6px 0;border-bottom:1px solid #f0f0f0"><strong>${asset}</strong>: <span style="color:#999">${sigs.error}</span></div>`;
                     const ce = (sigs.CE || [])[0], pe = (sigs.PE || [])[0];
                     return `<div style="display:flex;gap:16px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">
         <span style="font-weight:700;width:100px">${asset}</span>
-        <span style="color:#1a7a3c;font-size:.75rem">CE K=${ce?.strike?.toLocaleString() || '—'} score=${ce ? ((ce.signal_score || 0) * 100).toFixed(0) : '—'}</span>
-        <span style="color:#c0392b;font-size:.75rem">PE K=${pe?.strike?.toLocaleString() || '—'} score=${pe ? ((pe.signal_score || 0) * 100).toFixed(0) : '—'}</span>
+        <span style="color:#1a7a3c;font-size:.75rem">CE K=${ce?.strike ? (ce.strike / 100).toLocaleString() : '—'} score=${ce ? ((ce.signal_score || 0) * 100).toFixed(0) : '—'}</span>
+        <span style="color:#c0392b;font-size:.75rem">PE K=${pe?.strike ? (pe.strike / 100).toLocaleString() : '—'} score=${pe ? ((pe.signal_score || 0) * 100).toFixed(0) : '—'}</span>
       </div>`;
                 }).join('');
-            } catch (e) { }
+            } catch (e) { err('all-signals-content', e.message); }
         }
 
         // ── Greeks ────────────────────────────────────────────────────────────────────
         async function loadGreeks() {
             const asset = document.getElementById('gr-asset')?.value || 'NIFTY';
             try {
-                const d = await api(`/iv-surface?asset=${asset}`);
-                if (!Array.isArray(d) || !d.length) return;
-
+                const d = await apiFetch(`/iv-surface?asset=${asset}`);
+                if (!Array.isArray(d) || !d.length) { err('iv-smile-chart', 'No data'); return; }
                 const ce = d.filter(x => x.option_type === 'CE').sort((a, b) => a.strike - b.strike);
                 const pe = d.filter(x => x.option_type === 'PE').sort((a, b) => a.strike - b.strike);
                 const labels = [...new Set(d.map(x => (x.strike / 100).toFixed(0)))];
                 const get = (arr, f) => arr.map(x => x[f] != null ? x[f] : null);
 
-                function mkChart(id, label, ceD, peD, yLabel) {
+                function mkChart(id, label, ceD, peD) {
                     const ctx = document.getElementById(id)?.getContext('2d');
                     if (!ctx) return;
                     if (charts[id]) charts[id].destroy();
@@ -1444,18 +1447,16 @@
                             animation: false, plugins: { legend: { labels: { color: '#111', font: { size: 10 } } } },
                             scales: {
                                 x: { ticks: { color: '#555', maxTicksLimit: 8 }, grid: { color: '#f0f0f0' } },
-                                y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' }, title: { display: !!yLabel, text: yLabel || '' } }
+                                y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' } }
                             }
                         }
                     });
                 }
+                mkChart('delta-chart', 'Delta', get(ce, 'delta'), get(pe, 'delta'));
+                mkChart('gamma-chart', 'Gamma', get(ce, 'gamma'), get(pe, 'gamma'));
+                mkChart('theta-chart', 'Theta', get(ce, 'theta'), get(pe, 'theta'));
+                mkChart('vega-chart', 'Vega', get(ce, 'vega'), get(pe, 'vega'));
 
-                mkChart('delta-chart', 'Delta', get(ce, 'delta'), get(pe, 'delta'), 'Delta');
-                mkChart('gamma-chart', 'Gamma', get(ce, 'gamma'), get(pe, 'gamma'), 'Gamma');
-                mkChart('theta-chart', 'Theta', get(ce, 'theta'), get(pe, 'theta'), 'Theta');
-                mkChart('vega-chart', 'Vega', get(ce, 'vega'), get(pe, 'vega'), 'Vega');
-
-                // IV Smile
                 const ctx = document.getElementById('iv-smile-chart')?.getContext('2d');
                 if (ctx) {
                     if (charts.iv) charts.iv.destroy();
@@ -1476,59 +1477,34 @@
                         }
                     });
                 }
-
-                // Live Greeks from WS if market open
-                if (mktStatus === 'open' && lastData.greeks?.length) {
-                    renderLiveGreeks(lastData.greeks);
-                }
-            } catch (e) { console.error('greeks:', e); }
+            } catch (e) { err('iv-smile-chart', 'Greeks failed: ' + e.message); }
         }
 
-        function renderLiveGreeks(greeks) {
-            const el = document.getElementById('live-greeks-table');
-            if (!el || !greeks.length) return;
-            el.innerHTML = greeks.slice(0, 20).map(g => `<tr>
-    <td>${g.inst_id || '—'}</td>
-    <td>${fmt(g.ltp / 100, 2)}</td>
-    <td>${g.iv ? (g.iv * 100).toFixed(1) + '%' : '—'}</td>
-    <td class="${clr(g.delta)}">${fmt(g.delta, 3)}</td>
-    <td>${fmt(g.gamma, 5)}</td>
-    <td class="${clr(g.theta)}">${fmt(g.theta, 2)}</td>
-    <td>${fmt(g.vega, 2)}</td>
-    <td>${fmtN(g.oi)}</td>
-  </tr>`).join('');
-        }
+        const fetchGreeks = loadGreeks;
 
         // ── Historical ────────────────────────────────────────────────────────────────
         async function loadHistory() {
             const sym = document.getElementById('h-asset')?.value || 'NIFTY';
             const interval = document.getElementById('h-interval')?.value || '1d';
             const start = document.getElementById('h-start')?.value || '2025-01-01T03:45:00.000Z';
+            const ctx = document.getElementById('hist-chart')?.getContext('2d');
+            if (!ctx) return;
             try {
-                const d = await api(`/historical?symbol=${sym}&interval=${interval}&start=${encodeURIComponent(start)}&fields=open,high,low,close,tick_volume`);
+                const d = await apiFetch(`/historical?symbol=${sym}&interval=${interval}&start=${encodeURIComponent(start)}&fields=open,high,low,close,tick_volume`);
                 const vals = d.result?.[0]?.values?.[0]?.[sym];
                 const closes = vals?.close || [];
-                if (!closes.length) { console.warn('No historical data'); return; }
-
+                if (!closes.length) { err('hist-chart', 'No historical data'); return; }
                 const labels = closes.map(p => {
-                    const dt = new Date(p.ts / 1e6);
+                    const dt = new Date((p.ts || p.timestamp) / 1e6);
                     return interval === '1d' || interval === '1w'
                         ? dt.toLocaleDateString('en-IN')
                         : dt.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 });
-                const data = closes.map(p => (p.v / 100).toFixed(2));
-
-                const ctx = document.getElementById('hist-chart')?.getContext('2d');
-                if (!ctx) return;
+                const data = closes.map(p => ((p.v || p.value) / 100).toFixed(2));
                 if (charts.hist) charts.hist.destroy();
                 charts.hist = new Chart(ctx, {
                     type: 'line',
-                    data: {
-                        labels, datasets: [{
-                            label: sym + ' Close', data,
-                            borderColor: '#111', borderWidth: 1.5, pointRadius: 0, fill: false
-                        }]
-                    },
+                    data: { labels, datasets: [{ label: sym + ' Close', data, borderColor: '#111', borderWidth: 1.5, pointRadius: 0, fill: false }] },
                     options: {
                         animation: false, plugins: { legend: { labels: { color: '#111' } } },
                         scales: {
@@ -1537,11 +1513,11 @@
                         }
                     }
                 });
-
-                // Normalised returns
-                loadNormReturns();
-            } catch (e) { console.error('historical:', e); }
+            } catch (e) { err('hist-chart', 'Historical failed: ' + e.message); }
+            loadNormReturns();
         }
+
+        const fetchHistorical = loadHistory;
 
         async function loadNormReturns() {
             const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
@@ -1550,24 +1526,23 @@
             for (const a of assets) {
                 try {
                     const exc = ['SENSEX', 'BANKEX'].includes(a) ? 'BSE' : 'NSE';
-                    const d = await api(`/historical?symbol=${a}&exchange=${exc}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
+                    const d = await apiFetch(`/historical?symbol=${a}&exchange=${exc}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
                     const closes = d.result?.[0]?.values?.[0]?.[a]?.close || [];
                     if (!closes.length) continue;
                     const base = closes[0].v || closes[0].value;
                     datasets.push({
-                        label: a, data: closes.map(p => ((p.v / base) * 100).toFixed(2)),
+                        label: a, data: closes.map(p => (((p.v || p.value) / base) * 100).toFixed(2)),
                         borderColor: colors[a], borderWidth: 1.5, pointRadius: 0, fill: false
                     });
                 } catch (e) { }
             }
             if (!datasets.length) return;
-            const maxLen = Math.max(...datasets.map(d => d.data.length));
             const ctx = document.getElementById('norm-chart')?.getContext('2d');
             if (!ctx) return;
             if (charts.norm) charts.norm.destroy();
             charts.norm = new Chart(ctx, {
                 type: 'line',
-                data: { labels: Array.from({ length: maxLen }, (_, i) => i + 1), datasets },
+                data: { labels: Array.from({ length: Math.max(...datasets.map(d => d.data.length)) }, (_, i) => i + 1), datasets },
                 options: {
                     animation: false, plugins: { legend: { labels: { color: '#111', font: { size: 10 } } } },
                     scales: {
@@ -1578,32 +1553,38 @@
             });
         }
 
-        // ── Auto-refresh when market open ─────────────────────────────────────────────
+        // ── Auto-refresh ──────────────────────────────────────────────────────────────
         function startAutoRefresh() {
-            // Refresh dashboard every 60s when market open
             setInterval(() => {
                 if (mktStatus === 'open') {
-                    const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
-                    if (activePage === 'dashboard') loadDashboard();
-                    if (activePage === 'vol') loadVol();
-                    if (activePage === 'signals') loadSignals();
-                    if (activePage === 'greeks') loadGreeks();
+                    const page = document.querySelector('.page.active')?.id?.replace('page-', '');
+                    if (page === 'dashboard') loadDashboard();
+                    if (page === 'vol') loadVol();
+                    if (page === 'signals') loadSignals();
                 }
             }, 60000);
         }
 
-        
-// ── Aliases (HTML buttons use fetch* names, JS defines load* names) ──────────
-const fetchVol       = loadVol;
-const fetchStrategy  = loadStrategy;
-const fetchSignals   = loadSignals;
-const fetchGreeks    = loadGreeks;
-const fetchHistorical = loadHistory;
+        // ── Init ──────────────────────────────────────────────────────────────────────
+        async function init() {
+            // Wake up server first, then load dashboard
+            const b = document.getElementById('mkt-badge');
+            const s = document.getElementById('hstatus');
+            b.textContent = '○ Waking server…';
+            s.textContent = 'Connecting (may take 30s on first load)…';
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-        connectWS();
-        loadDashboard();
-        startAutoRefresh();
+            try {
+                await checkHealth();
+                connectWS();
+                loadDashboard();
+                startAutoRefresh();
+            } catch (e) {
+                // Server still waking — retry in 5s
+                setTimeout(init, 5000);
+            }
+        }
+
+        init();
     </script>
 </body>
 
