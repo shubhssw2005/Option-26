@@ -241,8 +241,8 @@ def _collect_historical(client):
 # ── App lifecycle ─────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    from nubra_client import get_client
     import glob, shutil
+    from collect_data import init_db
 
     # Copy models from repo to /tmp
     for src in glob.glob("trained_models/*.pkl"):
@@ -252,35 +252,50 @@ async def lifespan(_app: FastAPI):
             logger.info(f"[startup] Copied {os.path.basename(src)}")
 
     # Init DB
-    from collect_data import init_db
-
     init_db(DB_PATH)
 
-    # Auth
-    client = get_client()
-    if client:
-        state["client"] = client
-        logger.info("[server] Authenticated ✓")
+    # Auth via TOTP (automatic — no interactive prompts)
+    try:
+        from auto_auth import get_authenticated_client
+        client_sdk = get_authenticated_client()
+        if client_sdk:
+            import shelve as _shelve
+            try:
+                with _shelve.open("auth_data.db", flag="r") as db:
+                    token  = db.get("session_token", "")
+                    device = db.get("x-device-id", "TS123")
+            except Exception:
+                token, device = "", "TS123"
 
-        # Fetch historical data in background
-        def _load():
-            time.sleep(3)
-            count = query_df("SELECT COUNT(*) as n FROM historical_candle").iloc[0]["n"]
-            if count < 10:
-                logger.info("[startup] Fetching historical data...")
-                _collect_historical(client)
+            os.environ["NUBRA_SESSION_TOKEN"] = token
+            os.environ["NUBRA_DEVICE_ID"]     = device
 
-        threading.Thread(target=_load, daemon=True).start()
-        threading.Thread(target=_scheduler, daemon=True).start()
-        threading.Thread(target=_keep_alive, daemon=True).start()
+            from nubra_client import NubraDirectClient
+            client = NubraDirectClient(token, device)
+            if client.is_valid():
+                state["client"] = client
+                logger.info(f"[server] Authenticated ✓ device={device[:20]}")
 
-        # Auto-refresh token every 10h using TOTP (no SMS needed)
-        from token_refresh import start_token_refresh_loop
-        start_token_refresh_loop(state, interval_hours=10.0)
-    else:
-        logger.warning(
-            "[server] No auth — set NUBRA_SESSION_TOKEN + NUBRA_DEVICE_ID on Render"
-        )
+                # Background tasks
+                def _load():
+                    time.sleep(3)
+                    try:
+                        count = query_df("SELECT COUNT(*) as n FROM historical_candle").iloc[0]["n"]
+                        if count < 10:
+                            logger.info("[startup] Fetching historical data...")
+                            _collect_historical(client)
+                    except Exception as e:
+                        logger.error(f"[startup] {e}")
+
+                threading.Thread(target=_load,       daemon=True).start()
+                threading.Thread(target=_scheduler,  daemon=True).start()
+                threading.Thread(target=_keep_alive, daemon=True).start()
+            else:
+                logger.error("[server] Token invalid after TOTP login")
+        else:
+            logger.warning("[server] TOTP auth failed — check NUBRA_TOTP_SECRET on Render")
+    except Exception as e:
+        logger.error(f"[server] Auth error: {e}")
 
     logger.info("[server] Ready")
     yield
@@ -374,7 +389,7 @@ def vol_forecast(
             logger.warning(f"[vol] live fetch: {e}")
 
     if len(df) < 30:
-        raise HTTPException(404, f"No data for {symbol} ({len(df)} candles)")
+        return {"asset": symbol, "error": f"No data for {symbol} ({len(df)} candles)", "ensemble_vol_1d": None, "realized_vol_20d": None, "vol_regime": "unknown"}
 
     try:
         prices = df["close"]
