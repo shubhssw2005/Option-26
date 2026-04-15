@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Options Intelligence Platform</title>
+    <title>Options Intelligence — Institutional Terminal</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
         *,
@@ -15,101 +15,98 @@
             padding: 0
         }
 
-        :root {
-            --bg: #f8f8f8;
-            --surface: #fff;
-            --border: #e0e0e0;
-            --border2: #111;
-            --text: #111;
-            --muted: #666;
-            --green: #1a7a3c;
-            --red: #c0392b;
-            --blue: #1a3a6b;
-            --gold: #b8860b;
-            --accent: #111;
-            --font: 'Inter', system-ui, sans-serif;
-        }
-
+        html,
         body {
-            font-family: var(--font);
-            background: var(--bg);
-            color: var(--text);
-            font-size: 13px;
+            height: 100%;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            background: #fff;
+            color: #111;
+            font-size: 12px;
             line-height: 1.5
         }
 
         /* ── Layout ── */
-        .shell {
+        .app {
             display: grid;
-            grid-template-rows: 48px 1fr;
-            height: 100vh;
-            overflow: hidden
+            grid-template-rows: 40px 1fr;
+            height: 100vh
         }
 
-        header {
+        .topbar {
             background: #111;
             color: #fff;
             display: flex;
             align-items: center;
-            gap: 20px;
-            padding: 0 20px;
-            border-bottom: 2px solid #333
+            gap: 16px;
+            padding: 0 16px;
+            border-bottom: 1px solid #333;
+            font-size: 11px;
+            letter-spacing: .04em
         }
 
-        header h1 {
-            font-size: .85rem;
+        .topbar .logo {
             font-weight: 700;
-            letter-spacing: .12em;
-            text-transform: uppercase
-        }
-
-        .hbadge {
-            padding: 2px 8px;
-            border-radius: 2px;
-            font-size: .65rem;
-            font-weight: 700;
-            letter-spacing: .08em;
+            font-size: 12px;
+            letter-spacing: .1em;
             text-transform: uppercase;
-            border: 1px solid #555;
-            color: #ccc
-        }
-
-        .hbadge.live {
-            background: #1a7a3c;
-            border-color: #1a7a3c;
             color: #fff
         }
 
-        #hstatus {
-            font-size: .7rem;
-            color: #888;
-            margin-left: auto
+        .topbar .sep {
+            color: #444;
+            margin: 0 4px
         }
 
-        .htime {
-            font-size: .7rem;
-            color: #aaa;
-            font-variant-numeric: tabular-nums
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #444;
+            display: inline-block;
+            margin-right: 4px
         }
 
-        .body {
+        .status-dot.live {
+            background: #00ff88;
+            box-shadow: 0 0 4px #00ff88
+        }
+
+        .status-dot.warn {
+            background: #ffaa00
+        }
+
+        .topbar-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #888
+        }
+
+        .topbar-right .ist {
+            font-variant-numeric: tabular-nums;
+            color: #aaa
+        }
+
+        .main {
             display: grid;
-            grid-template-columns: 220px 1fr;
+            grid-template-columns: 200px 1fr;
             overflow: hidden
         }
 
-        nav {
-            background: #fff;
-            border-right: 1px solid var(--border);
+        /* ── Sidebar ── */
+        .sidebar {
+            background: #fafafa;
+            border-right: 1px solid #e8e8e8;
             overflow-y: auto;
-            padding: 12px 0
+            padding: 8px 0
         }
 
-        .nav-section {
-            padding: 4px 16px 2px;
-            font-size: .62rem;
+        .sidebar-section {
+            padding: 4px 12px 2px;
+            font-size: 9px;
             font-weight: 700;
-            letter-spacing: .1em;
+            letter-spacing: .12em;
             text-transform: uppercase;
             color: #999;
             margin-top: 8px
@@ -119,16 +116,16 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 7px 16px;
+            padding: 6px 12px;
             cursor: pointer;
-            font-size: .78rem;
-            color: #444;
-            border-left: 3px solid transparent;
-            transition: all .15s
+            font-size: 11px;
+            color: #555;
+            border-left: 2px solid transparent;
+            transition: all .1s
         }
 
         .nav-item:hover {
-            background: #f5f5f5;
+            background: #f0f0f0;
             color: #111
         }
 
@@ -139,29 +136,22 @@
             font-weight: 600
         }
 
-        .nav-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #ccc;
-            flex-shrink: 0
+        .nav-item .icon {
+            font-size: 10px;
+            width: 14px;
+            text-align: center;
+            opacity: .6
         }
 
-        .nav-dot.green {
-            background: var(--green)
-        }
-
-        .nav-dot.red {
-            background: var(--red)
-        }
-
-        main {
+        /* ── Content ── */
+        .content {
             overflow-y: auto;
-            padding: 20px
+            background: #fff
         }
 
         .page {
-            display: none
+            display: none;
+            padding: 16px
         }
 
         .page.active {
@@ -170,157 +160,406 @@
 
         /* ── Cards ── */
         .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            padding: 16px;
-            margin-bottom: 16px
+            border: 1px solid #e8e8e8;
+            border-radius: 2px;
+            margin-bottom: 12px;
+            background: #fff
+        }
+
+        .card-header {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            align-items: center;
+            justify-content: space-between
         }
 
         .card-title {
-            font-size: .68rem;
+            font-size: 10px;
             font-weight: 700;
             letter-spacing: .1em;
             text-transform: uppercase;
-            color: #555;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border)
+            color: #555
         }
 
-        .grid2 {
+        .card-body {
+            padding: 12px
+        }
+
+        .card-meta {
+            font-size: 10px;
+            color: #888
+        }
+
+        /* ── Grid ── */
+        .g2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 16px
+            gap: 12px
         }
 
-        .grid3 {
+        .g3 {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 16px
+            gap: 12px
         }
 
-        .grid4 {
+        .g4 {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 12px
+            gap: 10px
+        }
+
+        .g5 {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px
         }
 
         /* ── KPI tiles ── */
         .kpi {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            padding: 12px 14px
+            border: 1px solid #e8e8e8;
+            padding: 10px 12px;
+            border-radius: 2px
         }
 
         .kpi-label {
-            font-size: .65rem;
+            font-size: 9px;
             color: #888;
             text-transform: uppercase;
-            letter-spacing: .08em
+            letter-spacing: .08em;
+            margin-bottom: 3px
         }
 
         .kpi-value {
-            font-size: 1.4rem;
+            font-size: 18px;
             font-weight: 700;
-            margin: 2px 0;
-            font-variant-numeric: tabular-nums
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -.02em
         }
 
         .kpi-sub {
-            font-size: .7rem;
-            color: #888
+            font-size: 10px;
+            color: #888;
+            margin-top: 2px
+        }
+
+        .kpi-change {
+            font-size: 11px;
+            font-weight: 600
         }
 
         .up {
-            color: var(--green)
+            color: #00aa44
         }
 
         .down {
-            color: var(--red)
+            color: #cc2200
         }
 
         .neutral {
-            color: #555
+            color: #888
+        }
+
+        .kpi.alert {
+            border-color: #cc2200;
+            background: #fff8f8
+        }
+
+        .kpi.positive {
+            border-color: #00aa44;
+            background: #f8fff8
         }
 
         /* ── Tables ── */
-        table {
+        .tbl {
             width: 100%;
             border-collapse: collapse;
-            font-size: .76rem
+            font-size: 11px
         }
 
-        th {
+        .tbl th {
             text-align: left;
-            padding: 5px 8px;
-            font-size: .63rem;
+            padding: 4px 8px;
+            font-size: 9px;
             font-weight: 700;
-            letter-spacing: .07em;
+            letter-spacing: .08em;
             text-transform: uppercase;
-            color: #666;
-            border-bottom: 2px solid #111;
-            white-space: nowrap
-        }
-
-        td {
-            padding: 5px 8px;
-            border-bottom: 1px solid #f0f0f0;
-            font-variant-numeric: tabular-nums
-        }
-
-        tr:hover td {
+            color: #888;
+            border-bottom: 1px solid #e8e8e8;
+            white-space: nowrap;
             background: #fafafa
         }
 
-        .tag {
-            display: inline-block;
-            padding: 1px 6px;
+        .tbl td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #f5f5f5;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap
+        }
+
+        .tbl tr:hover td {
+            background: #fafafa
+        }
+
+        .tbl .atm td {
+            background: #fffbe6;
+            font-weight: 600
+        }
+
+        .tbl .ce-row td:first-child {
+            border-left: 2px solid #00aa44
+        }
+
+        .tbl .pe-row td:first-child {
+            border-left: 2px solid #cc2200
+        }
+
+        .tbl .signal-high {
+            color: #00aa44;
+            font-weight: 700
+        }
+
+        .tbl .signal-med {
+            color: #888
+        }
+
+        /* ── Strategy cards ── */
+        .strat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 10px
+        }
+
+        .strat-card {
+            border: 1px solid #e8e8e8;
             border-radius: 2px;
-            font-size: .62rem;
+            padding: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: border-color .15s
+        }
+
+        .strat-card:hover {
+            border-color: #111
+        }
+
+        .strat-card.top-pick {
+            border-color: #111;
+            border-width: 2px
+        }
+
+        .strat-card.top-pick::before {
+            content: 'TOP PICK';
+            position: absolute;
+            top: -1px;
+            right: 8px;
+            background: #111;
+            color: #fff;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            padding: 1px 6px
+        }
+
+        .strat-name {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 4px
+        }
+
+        .strat-score-bar {
+            height: 3px;
+            background: #e8e8e8;
+            border-radius: 2px;
+            margin: 6px 0
+        }
+
+        .strat-score-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: #111;
+            transition: width .3s
+        }
+
+        .strat-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-bottom: 6px
+        }
+
+        .tag {
+            font-size: 9px;
             font-weight: 700;
             letter-spacing: .06em;
-            text-transform: uppercase
+            text-transform: uppercase;
+            padding: 1px 5px;
+            border-radius: 1px;
+            border: 1px solid
         }
 
-        .tag-green {
-            background: #e8f5e9;
-            color: var(--green);
-            border: 1px solid #c8e6c9
+        .tag-bull {
+            color: #00aa44;
+            border-color: #00aa44;
+            background: #f0fff4
         }
 
-        .tag-red {
-            background: #fce4e4;
-            color: var(--red);
-            border: 1px solid #f5c6c6
+        .tag-bear {
+            color: #cc2200;
+            border-color: #cc2200;
+            background: #fff0f0
         }
 
-        .tag-blue {
-            background: #e3eaf5;
-            color: var(--blue);
-            border: 1px solid #c5d3e8
-        }
-
-        .tag-gold {
-            background: #fdf6e3;
-            color: var(--gold);
-            border: 1px solid #f0e0a0
-        }
-
-        .tag-grey {
-            background: #f5f5f5;
+        .tag-neutral {
             color: #555;
-            border: 1px solid #ddd
+            border-color: #ccc;
+            background: #f8f8f8
+        }
+
+        .tag-vol {
+            color: #0066cc;
+            border-color: #0066cc;
+            background: #f0f4ff
+        }
+
+        .tag-income {
+            color: #886600;
+            border-color: #886600;
+            background: #fffbf0
+        }
+
+        .strat-detail {
+            font-size: 10px;
+            color: #555;
+            line-height: 1.6
+        }
+
+        .strat-risk {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            align-items: center
+        }
+
+        .risk-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #e8e8e8
+        }
+
+        .risk-dot.filled {
+            background: #111
+        }
+
+        /* ── Regime badge ── */
+        .regime {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 1px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            border: 1px solid
+        }
+
+        .regime-bearish {
+            color: #cc2200;
+            border-color: #cc2200;
+            background: #fff0f0
+        }
+
+        .regime-bullish {
+            color: #00aa44;
+            border-color: #00aa44;
+            background: #f0fff4
+        }
+
+        .regime-ranging {
+            color: #0066cc;
+            border-color: #0066cc;
+            background: #f0f4ff
+        }
+
+        .regime-volatile {
+            color: #886600;
+            border-color: #886600;
+            background: #fffbf0
+        }
+
+        .regime-uncertain {
+            color: #555;
+            border-color: #ccc;
+            background: #f8f8f8
+        }
+
+        /* ── Vol gauge ── */
+        .vol-gauge {
+            height: 4px;
+            background: #e8e8e8;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 4px 0
+        }
+
+        .vol-gauge-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width .5s
+        }
+
+        .vg-low {
+            background: #00aa44
+        }
+
+        .vg-mid {
+            background: #886600
+        }
+
+        .vg-high {
+            background: #cc2200
+        }
+
+        /* ── Risk panel ── */
+        .risk-panel {
+            background: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 2px;
+            padding: 10px 12px;
+            font-size: 11px
+        }
+
+        .risk-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid #f0f0f0
+        }
+
+        .risk-row:last-child {
+            border-bottom: none
+        }
+
+        .risk-label {
+            color: #888
+        }
+
+        .risk-value {
+            font-weight: 600;
+            font-variant-numeric: tabular-nums
         }
 
         /* ── Controls ── */
         .controls {
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
             align-items: center;
-            margin-bottom: 14px
+            flex-wrap: wrap;
+            margin-bottom: 10px
         }
 
         select,
@@ -328,11 +567,11 @@
             background: #fff;
             border: 1px solid #ccc;
             color: #111;
-            padding: 5px 10px;
-            border-radius: 2px;
-            font-size: .78rem;
-            outline: none;
-            font-family: inherit
+            padding: 4px 8px;
+            border-radius: 1px;
+            font-size: 11px;
+            font-family: inherit;
+            outline: none
         }
 
         select:focus,
@@ -344,249 +583,52 @@
             background: #111;
             border: none;
             color: #fff;
-            padding: 6px 14px;
-            border-radius: 2px;
+            padding: 4px 12px;
+            border-radius: 1px;
             cursor: pointer;
-            font-size: .75rem;
+            font-size: 11px;
+            font-family: inherit;
             font-weight: 600;
-            letter-spacing: .04em;
-            font-family: inherit
+            letter-spacing: .04em
         }
 
         button:hover {
             background: #333
         }
 
-        button.outline {
+        button.ghost {
             background: #fff;
             color: #111;
-            border: 1px solid #111
+            border: 1px solid #ccc
         }
 
-        button.outline:hover {
+        button.ghost:hover {
             background: #f5f5f5
         }
 
-        button.green-btn {
-            background: var(--green)
-        }
-
-        button.red-btn {
-            background: var(--red)
-        }
-
-        /* ── Strategy cards ── */
-        .strat-card {
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            padding: 14px;
-            margin-bottom: 10px;
-            position: relative
-        }
-
-        .strat-card.top {
-            border-left: 4px solid #111
-        }
-
-        .strat-score {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            font-size: 1.1rem;
-            font-weight: 700
-        }
-
-        .strat-name {
-            font-size: .88rem;
-            font-weight: 700;
-            margin-bottom: 4px
-        }
-
-        .strat-meta {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-bottom: 8px
-        }
-
-        .strat-reasons {
-            font-size: .72rem;
-            color: #555;
-            margin-bottom: 6px
-        }
-
-        .strat-reason {
-            padding: 2px 0;
-            border-left: 2px solid #1a7a3c;
-            padding-left: 6px;
-            margin-bottom: 3px
-        }
-
-        .strat-warning {
-            padding: 2px 0;
-            border-left: 2px solid #c0392b;
-            padding-left: 6px;
-            margin-bottom: 3px;
-            color: #c0392b
-        }
-
-        .strat-legs {
-            font-size: .72rem;
-            background: #f8f8f8;
-            border-radius: 2px;
-            padding: 8px;
-            margin-top: 8px
-        }
-
-        .leg-row {
-            display: flex;
-            gap: 12px;
-            padding: 3px 0;
-            border-bottom: 1px solid #eee
-        }
-
-        .leg-row:last-child {
-            border-bottom: none
-        }
-
-        /* ── Regime badge ── */
-        .regime-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 2px;
-            font-size: .72rem;
-            font-weight: 700;
-            letter-spacing: .06em;
-            text-transform: uppercase
-        }
-
-        .regime-trending-up {
-            background: #e8f5e9;
-            color: var(--green);
-            border: 1px solid #c8e6c9
-        }
-
-        .regime-trending-down {
-            background: #fce4e4;
-            color: var(--red);
-            border: 1px solid #f5c6c6
-        }
-
-        .regime-ranging {
-            background: #e3eaf5;
-            color: var(--blue);
-            border: 1px solid #c5d3e8
-        }
-
-        .regime-crash {
-            background: #111;
-            color: #fff
-        }
-
-        .regime-uncertain {
-            background: #f5f5f5;
-            color: #555;
-            border: 1px solid #ddd
-        }
-
-        /* ── Vol gauge ── */
-        .vol-gauge {
-            display: flex;
-            flex-direction: column;
-            gap: 4px
-        }
-
-        .gauge-bar {
-            height: 8px;
-            background: #eee;
-            border-radius: 4px;
-            overflow: hidden
-        }
-
-        .gauge-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width .5s
-        }
-
-        .gauge-cheap {
-            background: var(--green)
-        }
-
-        .gauge-fair {
-            background: var(--gold)
-        }
-
-        .gauge-expensive {
-            background: var(--red)
-        }
-
-        /* ── Greeks grid ── */
-        .greeks-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 8px
-        }
-
-        .greek-box {
-            text-align: center;
-            padding: 8px;
-            border: 1px solid var(--border);
-            border-radius: 2px
-        }
-
-        .greek-name {
-            font-size: .62rem;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: .06em
-        }
-
-        .greek-val {
-            font-size: 1rem;
-            font-weight: 700;
-            margin-top: 2px
-        }
-
-        /* ── Chain table ── */
-        .chain-wrap {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px
-        }
-
-        .chain-label {
-            font-size: .68rem;
-            font-weight: 700;
-            letter-spacing: .08em;
-            text-transform: uppercase;
-            margin-bottom: 6px
-        }
-
-        .ce-label {
-            color: var(--green)
-        }
-
-        .pe-label {
-            color: var(--red)
-        }
-
-        .atm-row td {
-            background: #fffbe6;
-            font-weight: 600
-        }
-
-        /* ── Canvas ── */
+        /* ── Chart ── */
         canvas {
-            max-height: 260px
+            max-height: 200px
+        }
+
+        /* ── Loading ── */
+        .loading {
+            color: #888;
+            font-size: 11px;
+            padding: 12px 0;
+            text-align: center
+        }
+
+        .error-msg {
+            color: #cc2200;
+            font-size: 11px;
+            padding: 8px 0
         }
 
         /* ── Scrollbar ── */
         ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px
+            width: 4px;
+            height: 4px
         }
 
         ::-webkit-scrollbar-track {
@@ -595,26 +637,23 @@
 
         ::-webkit-scrollbar-thumb {
             background: #ccc;
-            border-radius: 3px
+            border-radius: 2px
         }
 
         /* ── Responsive ── */
-        @media(max-width:900px) {
-            .body {
+        @media(max-width:800px) {
+            .main {
                 grid-template-columns: 1fr
             }
 
-            nav {
+            .sidebar {
                 display: none
             }
 
-            .grid2,
-            .grid3,
-            .grid4 {
-                grid-template-columns: 1fr
-            }
-
-            .chain-wrap {
+            .g2,
+            .g3,
+            .g4,
+            .g5 {
                 grid-template-columns: 1fr
             }
         }
@@ -622,142 +661,47 @@
 </head>
 
 <body>
-    <div class="shell">
+    <div class="app">
 
-        <header>
-            <h1>Options Intelligence</h1>
-            <span class="hbadge" id="ws-badge">Connecting</span>
-            <span class="hbadge" id="mkt-badge">Market</span>
-            <span id="hstatus"></span>
-            <span class="htime" id="htime"></span>
-        </header>
+        <!-- ── Top bar ── -->
+        <div class="topbar">
+            <span class="logo">Options Intelligence</span>
+            <span class="sep">|</span>
+            <span><span class="status-dot" id="auth-dot"></span><span id="auth-label">Connecting</span></span>
+            <span class="sep">|</span>
+            <span><span class="status-dot" id="ws-dot"></span><span id="ws-label">WS</span></span>
+            <span class="sep">|</span>
+            <span id="mkt-status">—</span>
+            <div class="topbar-right">
+                <span id="ist-time" class="ist">—</span>
+            </div>
+        </div>
 
-        <div class="body">
-            <nav>
-                <div class="nav-section">Market</div>
-                <div class="nav-item active" onclick="show('dashboard')"><span class="nav-dot green"></span>Dashboard
-                </div>
-                <div class="nav-item" onclick="show('chain')"><span class="nav-dot"></span>Option Chain</div>
-                <div class="nav-item" onclick="show('vol')"><span class="nav-dot"></span>Volatility</div>
+        <div class="main">
 
-                <div class="nav-section">Strategy</div>
-                <div class="nav-item" onclick="show('strategy')"><span class="nav-dot green"></span>Strategy Engine
-                </div>
-                <div class="nav-item" onclick="show('signals')"><span class="nav-dot"></span>ML Signals</div>
+            <!-- ── Sidebar ── -->
+            <div class="sidebar">
+                <div class="sidebar-section">Market</div>
+                <div class="nav-item active" onclick="show('overview')"><span class="icon">◈</span>Overview</div>
+                <div class="nav-item" onclick="show('chain')"><span class="icon">≡</span>Option Chain</div>
 
-                <div class="nav-section">Analytics</div>
-                <div class="nav-item" onclick="show('greeks')"><span class="nav-dot"></span>Greeks</div>
-                <div class="nav-item" onclick="show('history')"><span class="nav-dot"></span>Historical</div>
-            </nav>
+                <div class="sidebar-section">Analysis</div>
+                <div class="nav-item" onclick="show('strategy')"><span class="icon">◎</span>Strategy Engine</div>
+                <div class="nav-item" onclick="show('volatility')"><span class="icon">∿</span>Volatility</div>
+                <div class="nav-item" onclick="show('signals')"><span class="icon">◉</span>ML Signals</div>
 
-            <main>
+                <div class="sidebar-section">Data</div>
+                <div class="nav-item" onclick="show('greeks')"><span class="icon">Δ</span>Greeks</div>
+                <div class="nav-item" onclick="show('history')"><span class="icon">↗</span>Historical</div>
+            </div>
 
-                <!-- ── DASHBOARD ── -->
-                <div class="page active" id="page-dashboard">
-                    <div class="grid4" id="kpi-row" style="margin-bottom:16px"></div>
-                    <div class="grid2">
-                        <div class="card">
-                            <div class="card-title">Live Index</div>
-                            <div id="index-list">
-                                <p style="color:#999;font-size:.8rem">Waiting for data…</p>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-title">Vol Regime — All Assets</div>
-                            <div id="vol-regime-list"></div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Top Strategy Recommendations</div>
-                        <div class="controls">
-                            <select id="dash-asset" onchange="loadDashboard()">
-                                <option>NIFTY</option>
-                                <option>BANKNIFTY</option>
-                                <option>FINNIFTY</option>
-                                <option>MIDCPNIFTY</option>
-                                <option>SENSEX</option>
-                                <option>BANKEX</option>
-                            </select>
-                            <select id="dash-dte">
-                                <option value="7">7 DTE</option>
-                                <option value="14">14 DTE</option>
-                                <option value="21">21 DTE</option>
-                                <option value="30">30 DTE</option>
-                            </select>
-                            <button onclick="loadDashboard()">Refresh</button>
-                        </div>
-                        <div id="top-strategies"></div>
-                    </div>
-                </div>
+            <!-- ── Pages ── -->
+            <div class="content">
 
-                <!-- ── OPTION CHAIN ── -->
-                <div class="page" id="page-chain">
-                    <div class="card">
-                        <div class="card-title">Option Chain</div>
-                        <div class="controls">
-                            <select id="oc-asset">
-                                <option>NIFTY</option>
-                                <option>BANKNIFTY</option>
-                                <option>FINNIFTY</option>
-                                <option>MIDCPNIFTY</option>
-                                <option>SENSEX</option>
-                                <option>BANKEX</option>
-                            </select>
-                            <select id="oc-exchange">
-                                <option>NSE</option>
-                                <option>BSE</option>
-                            </select>
-                            <input id="oc-expiry" placeholder="YYYYMMDD" style="width:110px" />
-                            <button onclick="fetchChain()">Load</button>
-                            <span id="atm-info" style="font-size:.75rem;color:#555;margin-left:8px"></span>
-                        </div>
-                        <div class="chain-wrap">
-                            <div>
-                                <div class="chain-label ce-label">Calls (CE)</div>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Strike</th>
-                                            <th>LTP</th>
-                                            <th>IV%</th>
-                                            <th>Delta</th>
-                                            <th>Gamma</th>
-                                            <th>Theta</th>
-                                            <th>Vega</th>
-                                            <th>OI</th>
-                                            <th>Vol</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="ce-table"></tbody>
-                                </table>
-                            </div>
-                            <div>
-                                <div class="chain-label pe-label">Puts (PE)</div>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Strike</th>
-                                            <th>LTP</th>
-                                            <th>IV%</th>
-                                            <th>Delta</th>
-                                            <th>Gamma</th>
-                                            <th>Theta</th>
-                                            <th>Vega</th>
-                                            <th>OI</th>
-                                            <th>Vol</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="pe-table"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── VOLATILITY ── -->
-                <div class="page" id="page-vol">
+                <!-- OVERVIEW -->
+                <div class="page active" id="page-overview">
                     <div class="controls">
-                        <select id="vol-asset" onchange="fetchVol()">
+                        <select id="ov-asset" onchange="loadOverview()">
                             <option>NIFTY</option>
                             <option>BANKNIFTY</option>
                             <option>FINNIFTY</option>
@@ -765,75 +709,219 @@
                             <option>SENSEX</option>
                             <option>BANKEX</option>
                         </select>
-                        <button onclick="fetchVol()">Refresh</button>
+                        <button onclick="loadOverview()">Refresh</button>
+                        <span id="ov-updated" style="color:#888;font-size:10px"></span>
                     </div>
-                    <div class="grid4" id="vol-kpis" style="margin-bottom:16px"></div>
-                    <div class="grid2">
-                        <div class="card">
-                            <div class="card-title">GARCH Model Comparison</div>
-                            <canvas id="garch-chart"></canvas>
+
+                    <!-- Market regime + key metrics -->
+                    <div id="regime-bar" style="margin-bottom:12px"></div>
+
+                    <!-- KPI row -->
+                    <div class="g5" id="kpi-row" style="margin-bottom:12px">
+                        <div class="kpi">
+                            <div class="kpi-label">Last Close</div>
+                            <div class="kpi-value loading">—</div>
                         </div>
-                        <div class="card">
-                            <div class="card-title">5-Day Vol Forecast</div>
-                            <canvas id="forecast-chart"></canvas>
+                        <div class="kpi">
+                            <div class="kpi-label">5d Return</div>
+                            <div class="kpi-value loading">—</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">GARCH 1d Vol</div>
+                            <div class="kpi-value loading">—</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">Realized 20d</div>
+                            <div class="kpi-value loading">—</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">Drawdown</div>
+                            <div class="kpi-value loading">—</div>
                         </div>
                     </div>
-                    <div class="card">
-                        <div class="card-title">SARIMA Return Forecast</div>
-                        <div id="sarima-result"></div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">All Assets — Vol Summary</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Asset</th>
-                                    <th>GARCH 1d%</th>
-                                    <th>Ann.Vol%</th>
-                                    <th>Realized 20d%</th>
-                                    <th>IV%</th>
-                                    <th>IV Percentile</th>
-                                    <th>VRP</th>
-                                    <th>PCR</th>
-                                    <th>Regime</th>
-                                </tr>
-                            </thead>
-                            <tbody id="vol-all-table"></tbody>
-                        </table>
+
+                    <div class="g2">
+                        <!-- Strategy recommendation -->
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="card-title">Strategy Recommendation</span>
+                                <span class="card-meta" id="strat-regime-label"></span>
+                            </div>
+                            <div class="card-body" id="strat-cards">
+                                <div class="loading">Loading…</div>
+                            </div>
+                        </div>
+
+                        <!-- Vol regime + live index -->
+                        <div>
+                            <div class="card">
+                                <div class="card-header"><span class="card-title">Volatility Regime</span></div>
+                                <div class="card-body" id="vol-regime-panel">
+                                    <div class="loading">Loading…</div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <span class="card-title">Live Index</span>
+                                    <span id="live-badge" style="font-size:9px;color:#888">MARKET CLOSED</span>
+                                </div>
+                                <div class="card-body" id="live-index-panel">
+                                    <div class="loading">Loading…</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ── STRATEGY ENGINE ── -->
+                <!-- OPTION CHAIN -->
+                <div class="page" id="page-chain">
+                    <div class="controls">
+                        <select id="oc-asset">
+                            <option>NIFTY</option>
+                            <option>BANKNIFTY</option>
+                            <option>FINNIFTY</option>
+                            <option>MIDCPNIFTY</option>
+                            <option>SENSEX</option>
+                            <option>BANKEX</option>
+                        </select>
+                        <select id="oc-exchange">
+                            <option>NSE</option>
+                            <option>BSE</option>
+                        </select>
+                        <input id="oc-expiry" placeholder="YYYYMMDD" style="width:100px" />
+                        <button onclick="loadChain()">Load Chain</button>
+                        <span id="chain-meta" style="color:#888;font-size:10px"></span>
+                    </div>
+                    <div class="g2">
+                        <div>
+                            <div
+                                style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00aa44;margin-bottom:4px">
+                                CALLS (CE)</div>
+                            <table class="tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Strike</th>
+                                        <th>LTP</th>
+                                        <th>IV%</th>
+                                        <th>Δ Delta</th>
+                                        <th>Γ Gamma</th>
+                                        <th>Θ Theta</th>
+                                        <th>ν Vega</th>
+                                        <th>OI</th>
+                                        <th>Vol</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ce-table">
+                                    <tr>
+                                        <td colspan="9" class="loading">Enter expiry to load</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <div
+                                style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#cc2200;margin-bottom:4px">
+                                PUTS (PE)</div>
+                            <table class="tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Strike</th>
+                                        <th>LTP</th>
+                                        <th>IV%</th>
+                                        <th>Δ Delta</th>
+                                        <th>Γ Gamma</th>
+                                        <th>Θ Theta</th>
+                                        <th>ν Vega</th>
+                                        <th>OI</th>
+                                        <th>Vol</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pe-table">
+                                    <tr>
+                                        <td colspan="9" class="loading">Enter expiry to load</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STRATEGY ENGINE -->
                 <div class="page" id="page-strategy">
-                    <div class="card">
-                        <div class="card-title">Strategy Recommendation Engine</div>
-                        <div class="controls">
-                            <select id="st-asset">
-                                <option>NIFTY</option>
-                                <option>BANKNIFTY</option>
-                                <option>FINNIFTY</option>
-                                <option>MIDCPNIFTY</option>
-                                <option>SENSEX</option>
-                                <option>BANKEX</option>
-                            </select>
-                            <select id="st-dte">
-                                <option value="7">7 DTE</option>
-                                <option value="14">14 DTE</option>
-                                <option value="21">21 DTE</option>
-                                <option value="30">30 DTE</option>
-                            </select>
-                            <button onclick="fetchStrategy()">Analyse</button>
-                        </div>
-                        <div id="regime-display" style="margin-bottom:14px"></div>
-                        <div id="strategy-list"></div>
+                    <div class="controls">
+                        <select id="st-asset">
+                            <option>NIFTY</option>
+                            <option>BANKNIFTY</option>
+                            <option>FINNIFTY</option>
+                            <option>MIDCPNIFTY</option>
+                        </select>
+                        <select id="st-dte">
+                            <option value="7">7 DTE</option>
+                            <option value="14">14 DTE</option>
+                            <option value="21">21 DTE</option>
+                            <option value="30">30 DTE</option>
+                        </select>
+                        <button onclick="loadStrategy()">Analyse</button>
                     </div>
-                    <div class="card" id="strike-calc-card" style="display:none">
-                        <div class="card-title">Strike Calculator</div>
-                        <div id="strike-result"></div>
+
+                    <!-- Market context -->
+                    <div id="st-context" style="margin-bottom:12px"></div>
+
+                    <!-- Why this strategy section -->
+                    <div class="card" style="margin-bottom:12px">
+                        <div class="card-header"><span class="card-title">Why These Strategies — Real Data
+                                Reasoning</span></div>
+                        <div class="card-body" id="st-reasoning">
+                            <div class="loading">Loading…</div>
+                        </div>
+                    </div>
+
+                    <!-- Strategy cards -->
+                    <div id="st-cards" class="strat-grid">
+                        <div class="loading">Loading…</div>
+                    </div>
+
+                    <!-- Selected strategy detail -->
+                    <div id="st-detail" style="display:none;margin-top:12px">
+                        <div class="card">
+                            <div class="card-header"><span class="card-title" id="st-detail-title">Strategy
+                                    Detail</span></div>
+                            <div class="card-body" id="st-detail-body"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ── ML SIGNALS ── -->
+                <!-- VOLATILITY -->
+                <div class="page" id="page-volatility">
+                    <div class="controls">
+                        <select id="vol-asset" onchange="loadVol()">
+                            <option>NIFTY</option>
+                            <option>BANKNIFTY</option>
+                            <option>FINNIFTY</option>
+                            <option>MIDCPNIFTY</option>
+                            <option>SENSEX</option>
+                            <option>BANKEX</option>
+                        </select>
+                        <button onclick="loadVol()">Refresh</button>
+                    </div>
+                    <div class="g4" id="vol-kpis" style="margin-bottom:12px"></div>
+                    <div class="g2">
+                        <div class="card">
+                            <div class="card-header"><span class="card-title">GARCH Model Comparison</span></div>
+                            <div class="card-body"><canvas id="garch-chart"></canvas></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><span class="card-title">Vol Regime — All Assets</span></div>
+                            <div class="card-body" id="vol-all-panel"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Vol Analysis — What It Means</span></div>
+                        <div class="card-body" id="vol-interpretation"></div>
+                    </div>
+                </div>
+
+                <!-- ML SIGNALS -->
                 <div class="page" id="page-signals">
                     <div class="controls">
                         <select id="sig-asset">
@@ -842,103 +930,110 @@
                             <option>FINNIFTY</option>
                             <option>MIDCPNIFTY</option>
                         </select>
-                        <button onclick="fetchSignals()">Get Signals</button>
-                        <button class="outline" onclick="fetchAllSignals()">All Assets</button>
+                        <button onclick="loadSignals()">Get Signals</button>
+                        <button class="ghost" onclick="loadAllSignals()">All Assets</button>
                     </div>
-                    <div class="grid2">
-                        <div class="card">
-                            <div class="card-title ce-label">CE Signals</div>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Strike</th>
-                                        <th>LTP</th>
-                                        <th>IV%</th>
-                                        <th>Delta</th>
-                                        <th>OI</th>
-                                        <th>Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ce-signals"></tbody>
-                            </table>
-                        </div>
-                        <div class="card">
-                            <div class="card-title pe-label">PE Signals</div>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Strike</th>
-                                        <th>LTP</th>
-                                        <th>IV%</th>
-                                        <th>Delta</th>
-                                        <th>OI</th>
-                                        <th>Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="pe-signals"></tbody>
-                            </table>
+                    <div class="card" style="margin-bottom:12px">
+                        <div class="card-header"><span class="card-title">Model Info</span></div>
+                        <div class="card-body" style="font-size:11px;color:#555;line-height:1.8">
+                            Ensemble: CatBoost + XGBoost + LightGBM → Logistic Regression meta-learner.<br>
+                            Features: strike, IV, delta, gamma, theta, vega, OI, moneyness, momentum (1d/5d), IV rank,
+                            DTE.<br>
+                            Target: probability that option close price increases next day.<br>
+                            <strong>Score > 70</strong> = strong signal &nbsp;|&nbsp; <strong>50–70</strong> = moderate
+                            &nbsp;|&nbsp; <strong>&lt;50</strong> = weak/avoid
                         </div>
                     </div>
-                    <div class="card" id="all-signals-card" style="display:none">
-                        <div class="card-title">All Assets — Signal Summary</div>
-                        <div id="all-signals-content"></div>
+                    <div class="g2">
+                        <div class="card">
+                            <div class="card-header"><span class="card-title ce-label">CE Signals — Calls</span></div>
+                            <div class="card-body">
+                                <table class="tbl">
+                                    <thead>
+                                        <tr>
+                                            <th>Strike</th>
+                                            <th>LTP</th>
+                                            <th>IV%</th>
+                                            <th>Delta</th>
+                                            <th>OI</th>
+                                            <th>Score</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ce-signals">
+                                        <tr>
+                                            <td colspan="7" class="loading">Loading…</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><span class="card-title pe-label">PE Signals — Puts</span></div>
+                            <div class="card-body">
+                                <table class="tbl">
+                                    <thead>
+                                        <tr>
+                                            <th>Strike</th>
+                                            <th>LTP</th>
+                                            <th>IV%</th>
+                                            <th>Delta</th>
+                                            <th>OI</th>
+                                            <th>Score</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pe-signals">
+                                        <tr>
+                                            <td colspan="7" class="loading">Loading…</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="all-signals-panel" style="display:none;margin-top:12px">
+                        <div class="card">
+                            <div class="card-header"><span class="card-title">All Assets — Signal Summary</span></div>
+                            <div class="card-body" id="all-signals-body"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ── GREEKS ── -->
+                <!-- GREEKS -->
                 <div class="page" id="page-greeks">
                     <div class="controls">
-                        <select id="gr-asset" onchange="fetchGreeks()">
+                        <select id="gr-asset" onchange="loadGreeks()">
                             <option>NIFTY</option>
                             <option>BANKNIFTY</option>
                             <option>FINNIFTY</option>
                             <option>MIDCPNIFTY</option>
                         </select>
-                        <button onclick="fetchGreeks()">Load</button>
+                        <button onclick="loadGreeks()">Load</button>
                     </div>
-                    <div class="card">
-                        <div class="card-title">Greeks Across Strikes</div>
-                        <div class="grid2">
-                            <canvas id="delta-chart"></canvas>
-                            <canvas id="gamma-chart"></canvas>
+                    <div class="g2">
+                        <div class="card">
+                            <div class="card-header"><span class="card-title">IV Smile</span></div>
+                            <div class="card-body"><canvas id="iv-chart"></canvas></div>
                         </div>
-                        <div class="grid2" style="margin-top:16px">
-                            <canvas id="theta-chart"></canvas>
-                            <canvas id="vega-chart"></canvas>
+                        <div class="card">
+                            <div class="card-header"><span class="card-title">Delta Profile</span></div>
+                            <div class="card-body"><canvas id="delta-chart"></canvas></div>
                         </div>
                     </div>
-                    <div class="card">
-                        <div class="card-title">IV Smile</div>
-                        <canvas id="iv-smile-chart"></canvas>
+                    <div class="g2">
+                        <div class="card">
+                            <div class="card-header"><span class="card-title">Gamma</span></div>
+                            <div class="card-body"><canvas id="gamma-chart"></canvas></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><span class="card-title">Theta Decay</span></div>
+                            <div class="card-body"><canvas id="theta-chart"></canvas></div>
+                        </div>
                     </div>
-                </div>
-                <div class="card live-only">
-                    <div class="card-title">Live Greeks Ticks (WebSocket)</div>
-                    <div class="market-closed-msg" style="display:none;color:#888;font-size:.78rem;padding:8px 0">
-                        ○ Market closed — live Greeks stream inactive. Opens 09:15 IST.
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Inst ID</th>
-                                <th>LTP</th>
-                                <th>IV%</th>
-                                <th>Delta</th>
-                                <th>Gamma</th>
-                                <th>Theta</th>
-                                <th>Vega</th>
-                                <th>OI</th>
-                            </tr>
-                        </thead>
-                        <tbody id="live-greeks-table">
-                            <tr>
-                                <td colspan="8" style="color:#999">Waiting for WebSocket data…</td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
 
-                <!-- ── HISTORICAL ── -->
+                <!-- HISTORICAL -->
                 <div class="page" id="page-history">
                     <div class="controls">
                         <select id="h-asset">
@@ -950,73 +1045,70 @@
                             <option>BANKEX</option>
                         </select>
                         <select id="h-interval">
-                            <option value="1d">1D</option>
+                            <option value="1d">Daily</option>
                             <option value="1h">1H</option>
                             <option value="15m">15m</option>
-                            <option value="5m">5m</option>
                         </select>
                         <input id="h-start" value="2025-01-01T03:45:00.000Z" style="width:200px" />
-                        <button onclick="fetchHistorical()">Load</button>
+                        <button onclick="loadHistory()">Load</button>
+                    </div>
+                    <div class="card" style="margin-bottom:12px">
+                        <div class="card-header"><span class="card-title">Price History</span></div>
+                        <div class="card-body"><canvas id="hist-chart" style="max-height:240px"></canvas></div>
                     </div>
                     <div class="card">
-                        <div class="card-title">Price History</div>
-                        <canvas id="hist-chart"></canvas>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Normalised Returns — All Assets</div>
-                        <canvas id="norm-chart"></canvas>
+                        <div class="card-header"><span class="card-title">Normalised Returns — All Indices
+                                (base=100)</span></div>
+                        <div class="card-body"><canvas id="norm-chart" style="max-height:200px"></canvas></div>
                     </div>
                 </div>
 
-            </main>
-        </div>
-    </div>
-
+            </div><!-- content -->
+        </div><!-- main -->
+    </div><!-- app -->
 
     <script>
         'use strict';
 
-        // ── Config ────────────────────────────────────────────────────────────────────
         const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
             ? 'http://localhost:8000'
             : 'https://option-26.onrender.com';
 
-        const TIMEOUT_MS = 45000; // 45s — handles Render cold start
-        let charts = {}, mktStatus = 'unknown', serverReady = false;
+        const TIMEOUT = 60000;
+        let charts = {}, mktStatus = 'unknown', lastData = {};
 
-        // ── Core fetch with timeout + retry ──────────────────────────────────────────
+        // ── Utilities ─────────────────────────────────────────────────────────────────
+        const fmt = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) : '—';
+        const fmtN = v => v != null ? Number(v).toLocaleString('en-IN') : '—';
+        const fmtP = (v, d = 1) => v != null && !isNaN(v) ? Number(v).toFixed(d) + '%' : '—';
+        const clr = v => v > 0 ? 'up' : v < 0 ? 'down' : 'neutral';
+        const sign = v => v > 0 ? '+' : '';
+
         async function apiFetch(path, retries = 2) {
             for (let i = 0; i <= retries; i++) {
                 const ctrl = new AbortController();
-                const tid = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+                const tid = setTimeout(() => ctrl.abort(), TIMEOUT);
                 try {
                     const r = await fetch(API + path, { signal: ctrl.signal });
                     clearTimeout(tid);
-                    if (r.status === 404) throw new Error(`404 ${path}`);
-                    if (!r.ok) throw new Error(`${r.status} ${path}`);
+                    if (!r.ok) throw new Error(`${r.status}`);
                     return await r.json();
                 } catch (e) {
                     clearTimeout(tid);
-                    // Don't retry on 404 — resource genuinely missing
-                    if (e.message.startsWith('404') || i === retries) throw e;
+                    if (i === retries) throw e;
                     await new Promise(r => setTimeout(r, 3000));
                 }
             }
         }
 
-        // ── Loading helpers ───────────────────────────────────────────────────────────
-        function loading(el, msg = 'Loading…') {
-            if (typeof el === 'string') el = document.getElementById(el);
-            if (el) el.innerHTML = `<div style="color:#888;font-size:.8rem;padding:12px 0">${msg}</div>`;
+        function loading(id, msg = 'Loading…') {
+            const el = typeof id === 'string' ? document.getElementById(id) : id;
+            if (el) el.innerHTML = `<div class="loading">${msg}</div>`;
         }
-        function err(el, msg) {
-            if (typeof el === 'string') el = document.getElementById(el);
-            if (el) el.innerHTML = `<div style="color:#c0392b;font-size:.78rem;padding:8px 0">⚠ ${msg}</div>`;
+        function errMsg(id, msg) {
+            const el = typeof id === 'string' ? document.getElementById(id) : id;
+            if (el) el.innerHTML = `<div class="error-msg">⚠ ${msg}</div>`;
         }
-        const fmt = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) : '—';
-        const fmtN = v => v != null ? Number(v).toLocaleString('en-IN') : '—';
-        const fmtP = (v, d = 2) => v != null && !isNaN(v) ? Number(v).toFixed(d) + '%' : '—';
-        const clr = v => v > 0 ? 'up' : v < 0 ? 'down' : 'neutral';
 
         // ── Navigation ────────────────────────────────────────────────────────────────
         function show(page) {
@@ -1026,576 +1118,605 @@
             document.querySelectorAll('.nav-item').forEach(n => {
                 if (n.getAttribute('onclick')?.includes("'" + page + "'")) n.classList.add('active');
             });
-            const map = { vol: 'loadVol', greeks: 'loadGreeks', history: 'loadHistory', signals: 'loadSignals', strategy: 'loadStrategy' };
-            if (map[page]) window[map[page]]?.();
+            const loaders = { volatility: 'loadVol', greeks: 'loadGreeks', history: 'loadHistory', signals: 'loadSignals', strategy: 'loadStrategy' };
+            if (loaders[page]) window[loaders[page]]?.();
         }
 
-        // ── Clock ─────────────────────────────────────────────────────────────────────
+        // ── Clock + health ────────────────────────────────────────────────────────────
         setInterval(() => {
-            document.getElementById('htime').textContent = new Date().toLocaleTimeString('en-IN', { hour12: false });
+            document.getElementById('ist-time').textContent = new Date().toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' }) + ' IST';
         }, 1000);
 
-        // ── Server wake-up + health ───────────────────────────────────────────────────
         async function checkHealth() {
-            const b = document.getElementById('mkt-badge');
-            const s = document.getElementById('hstatus');
             try {
                 const d = await apiFetch('/health');
                 mktStatus = d.market_status || 'unknown';
-                serverReady = d.authenticated === true;
-                b.textContent = mktStatus === 'open' ? '● MARKET OPEN' : mktStatus === 'post_market' ? '◐ POST-MARKET' : '○ MARKET CLOSED';
-                b.className = 'hbadge' + (mktStatus === 'open' ? ' live' : '');
-                s.textContent = d.ist_time || '';
-                if (!serverReady) s.textContent += ' (auth pending)';
+                const authDot = document.getElementById('auth-dot');
+                const authLabel = document.getElementById('auth-label');
+                authDot.className = 'status-dot' + (d.authenticated ? ' live' : ' warn');
+                authLabel.textContent = d.authenticated ? 'Authenticated' : 'Auth Failed';
+                document.getElementById('mkt-status').textContent =
+                    mktStatus === 'open' ? '● MARKET OPEN' : mktStatus === 'post_market' ? '◐ POST-MARKET' : '○ MARKET CLOSED';
+                document.getElementById('mkt-status').style.color = mktStatus === 'open' ? '#00ff88' : '#888';
+                document.getElementById('live-badge').textContent = mktStatus === 'open' ? '● LIVE' : 'MARKET CLOSED';
+                document.getElementById('live-badge').style.color = mktStatus === 'open' ? '#00aa44' : '#888';
             } catch (e) {
-                b.textContent = '○ Waking up…';
-                b.className = 'hbadge';
-                s.textContent = 'Server starting (30s)…';
+                document.getElementById('auth-label').textContent = 'Offline';
             }
         }
         setInterval(checkHealth, 30000);
 
         // ── WebSocket ─────────────────────────────────────────────────────────────────
         function connectWS() {
-            const badge = document.getElementById('ws-badge');
+            const dot = document.getElementById('ws-dot');
+            const label = document.getElementById('ws-label');
             const wsUrl = API.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/live';
             const ws = new WebSocket(wsUrl);
-            ws.onopen = () => { badge.textContent = '● WS'; badge.className = 'hbadge live'; };
-            ws.onclose = () => { badge.textContent = '○ WS'; badge.className = 'hbadge'; setTimeout(connectWS, 5000); };
-            ws.onerror = () => { badge.textContent = '✗ WS'; badge.className = 'hbadge'; };
+            ws.onopen = () => { dot.className = 'status-dot live'; label.textContent = 'WS Live'; };
+            ws.onclose = () => { dot.className = 'status-dot'; label.textContent = 'WS Off'; setTimeout(connectWS, 5000); };
             ws.onmessage = e => {
                 try {
                     const d = JSON.parse(e.data);
-                    if (d.indexes?.length) renderLiveIndexes(d.indexes);
+                    if (d.indexes?.length) renderLiveIndex(d.indexes);
                 } catch (ex) { }
             };
         }
 
-        function renderLiveIndexes(indexes) {
-            const el = document.getElementById('index-list');
+        function renderLiveIndex(indexes) {
+            const el = document.getElementById('live-index-panel');
             if (!el) return;
             el.innerHTML = indexes.map(i => {
                 const val = (i.index_value / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
                 const chg = (i.changepercent || 0).toFixed(2);
-                return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">
+                return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f5f5f5">
       <span style="font-weight:600">${i.indexname}</span>
-      <div style="text-align:right">
-        <div style="font-size:1rem;font-weight:700">${val}</div>
-        <div class="${clr(chg)}" style="font-size:.72rem">${chg >= 0 ? '+' : ''}${chg}%</div>
-      </div></div>`;
+      <span>${val} <span class="${clr(chg)}">${chg >= 0 ? '+' : ''}${chg}%</span></span>
+    </div>`;
             }).join('');
         }
 
-        // ── Dashboard ─────────────────────────────────────────────────────────────────
-        async function loadDashboard() {
-            const asset = document.getElementById('dash-asset')?.value || 'NIFTY';
-            const dte = document.getElementById('dash-dte')?.value || '7';
+        // ── Overview ──────────────────────────────────────────────────────────────────
+        async function loadOverview() {
+            const asset = document.getElementById('ov-asset')?.value || 'NIFTY';
+            document.getElementById('ov-updated').textContent = 'Loading…';
 
-            loading('kpi-row', 'Loading volatility data…');
-            loading('vol-regime-list', 'Loading…');
-            loading('top-strategies', 'Loading strategy recommendations…');
+            // Fetch historical for real price analysis
+            let prices = [], rets = [], rv20 = 0, rv5 = 0, totalRet = 0, dd = 0, ret5 = 0, ret20 = 0;
+            try {
+                const h = await apiFetch(`/historical?symbol=${asset}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
+                const closes = h.result?.[0]?.values?.[0]?.[asset]?.close || [];
+                prices = closes.map(p => (p.value || p.v || 0) / 100);
+                if (prices.length > 1) {
+                    rets = prices.slice(1).map((p, i) => Math.log(p / prices[i]) * 100);
+                    const std = arr => { const m = arr.reduce((a, b) => a + b, 0) / arr.length; return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / arr.length); };
+                    rv20 = std(rets.slice(-20)) * Math.sqrt(252);
+                    rv5 = std(rets.slice(-5)) * Math.sqrt(252);
+                    totalRet = (prices.at(-1) - prices[0]) / prices[0] * 100;
+                    dd = (prices.at(-1) - Math.max(...prices)) / Math.max(...prices) * 100;
+                    ret5 = prices.length >= 5 ? (prices.at(-1) - prices.at(-5)) / prices.at(-5) * 100 : 0;
+                    ret20 = prices.length >= 20 ? (prices.at(-1) - prices.at(-20)) / prices.at(-20) * 100 : 0;
+                }
+            } catch (e) { }
 
-            // Vol KPIs
+            // Fetch vol forecast
+            let garch1d = 0, garchAnn = 0;
             try {
                 const vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
-                if (vf.error) { err('kpi-row', vf.error); }
-                else {
-                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
-                const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
-                const ivpColor = (vf.iv_percentile || 50) > 70 ? '#c0392b' : (vf.iv_percentile || 50) < 30 ? '#1a7a3c' : '#b8860b';
-                document.getElementById('kpi-row').innerHTML = [
-                    { label: 'GARCH 1d Vol', value: v1d + '%', sub: 'Ann: ' + vann + '%', color: parseFloat(v1d) > 2.5 ? '#c0392b' : '#111' },
-                    { label: 'Realized 20d', value: fmtP(vf.realized_vol_20d), sub: '5d: ' + fmtP(vf.realized_vol_5d), color: '#111' },
-                    { label: 'IV Percentile', value: fmtP(vf.iv_percentile), sub: 'Regime: ' + (vf.vol_regime || '—'), color: ivpColor },
-                    { label: 'Vol Risk Prem', value: fmtP(vf.vol_risk_premium), sub: 'PCR: ' + (vf.pcr || '—'), color: (vf.vol_risk_premium || 0) > 0 ? '#c0392b' : '#1a7a3c' },
-                ].map(k => `<div class="kpi"><div class="kpi-label">${k.label}</div>
-      <div class="kpi-value" style="color:${k.color}">${k.value}</div>
-      <div class="kpi-sub">${k.sub}</div></div>`).join('');
-                }
-            } catch (e) { err('kpi-row', 'Vol data unavailable: ' + e.message); }
+                garch1d = vf.ensemble_vol_1d || vf.garch_vol_1d || 0;
+                garchAnn = vf.ensemble_vol_ann || vf.garch_vol_ann || 0;
+                lastData.vol = vf;
+            } catch (e) { }
 
-            // Vol regimes all assets
+            // Determine regime from real data
+            const regime = determineRegime(ret5, ret20, rv5, rv20, garch1d);
+
+            // Render regime bar
+            document.getElementById('regime-bar').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:#fafafa;border:1px solid #e8e8e8;border-radius:2px">
+      <span class="regime regime-${regime.css}">${regime.label}</span>
+      <span style="font-size:11px;color:#555">${regime.description}</span>
+      <span style="margin-left:auto;font-size:10px;color:#888">${asset} · ${new Date().toLocaleDateString('en-IN')}</span>
+    </div>`;
+
+            // Render KPIs
+            const kpis = [
+                {
+                    label: 'Last Close', value: prices.length ? prices.at(-1).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—',
+                    sub: `High: ${prices.length ? Math.max(...prices).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—'}`,
+                    cls: ''
+                },
+                { label: '5d Return', value: fmtP(ret5), sub: `20d: ${fmtP(ret20)}`, cls: ret5 < 0 ? 'alert' : ret5 > 0 ? 'positive' : '' },
+                { label: 'GARCH 1d Vol', value: fmtP(garch1d), sub: `Ann: ${fmtP(garchAnn)}`, cls: garch1d > 2.5 ? 'alert' : '' },
+                { label: 'Realized 20d', value: fmtP(rv20), sub: `5d: ${fmtP(rv5)}`, cls: rv5 > rv20 * 1.5 ? 'alert' : '' },
+                { label: 'Drawdown', value: fmtP(dd), sub: `YTD: ${fmtP(totalRet)}`, cls: dd < -10 ? 'alert' : '' },
+            ];
+            document.getElementById('kpi-row').innerHTML = kpis.map(k =>
+                `<div class="kpi ${k.cls}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls === 'alert' ? 'down' : k.cls === 'positive' ? 'up' : ''}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`
+            ).join('');
+
+            // Load strategy
+            loadStrategyForOverview(asset, regime, ret5, ret20, rv5, rv20, garch1d);
+
+            // Load vol regimes
             loadVolRegimes();
 
-            // Strategy
+            document.getElementById('ov-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', { hour12: false });
+        }
+
+        function determineRegime(ret5, ret20, rv5, rv20, garch1d) {
+            const volExpanding = rv5 > rv20 * 1.3;
+            const strongBear = ret5 < -2 && ret20 < -5;
+            const strongBull = ret5 > 2 && ret20 > 5;
+            const ranging = Math.abs(ret5) < 1 && Math.abs(ret20) < 3;
+            const highVol = garch1d > 2.0;
+
+            if (strongBear && volExpanding) return { label: 'BEARISH + VOL EXPANSION', css: 'bearish', description: 'Sustained selling with rising volatility. Protective strategies, bear spreads.' };
+            if (strongBear) return { label: 'BEARISH TREND', css: 'bearish', description: 'Downtrend in place. Bear spreads, protective puts, avoid naked calls.' };
+            if (strongBull && volExpanding) return { label: 'BULLISH + VOL EXPANSION', css: 'bullish', description: 'Rally with rising vol. Bull spreads, covered calls to monetise premium.' };
+            if (strongBull) return { label: 'BULLISH TREND', css: 'bullish', description: 'Uptrend. Bull call spreads, covered calls, cash-secured puts.' };
+            if (ranging && highVol) return { label: 'RANGING + HIGH VOL', css: 'volatile', description: 'Sideways with elevated vol. Sell premium: straddles, strangles, iron condors.' };
+            if (ranging) return { label: 'RANGING / CONSOLIDATION', css: 'ranging', description: 'Low directional bias. Income strategies: covered calls, iron condors.' };
+            if (volExpanding) return { label: 'VOL EXPANSION', css: 'volatile', description: 'Vol rising without clear direction. Long straddles, protective options.' };
+            return { label: 'UNCERTAIN', css: 'uncertain', description: 'Mixed signals. Use defined-risk strategies only.' };
+        }
+
+        async function loadStrategyForOverview(asset, regime, ret5, ret20, rv5, rv20, garch1d) {
+            loading('strat-cards');
             try {
-                const d = await apiFetch(`/strategy-recommend?asset=${asset}&dte=${dte}`);
-                renderTopStrategies(d.top_recommendations || [], d);
-            } catch (e) { err('top-strategies', 'Strategy data unavailable: ' + e.message); }
+                const d = await apiFetch(`/strategy-recommend?asset=${asset}&dte=7`);
+                const top = d.top_recommendations || [];
+                document.getElementById('strat-regime-label').textContent = regime.label;
+
+                document.getElementById('strat-cards').innerHTML = top.slice(0, 4).map((s, i) => {
+                    const score = s.score || 0;
+                    const tf = s.trend_fit || 'neutral';
+                    const tagCls = tf.includes('bull') ? 'tag-bull' : tf.includes('bear') ? 'tag-bear' : 'tag-neutral';
+                    const catCls = s.category === 'income' ? 'tag-income' : s.category === 'volatility' ? 'tag-vol' : 'tag-neutral';
+                    return `<div class="strat-card ${i === 0 ? 'top-pick' : ''}" onclick="showStratDetail('${s.strategy_key}','${asset}')">
+        <div class="strat-name">${s.name}</div>
+        <div class="strat-score-bar"><div class="strat-score-fill" style="width:${score}%"></div></div>
+        <div style="font-size:9px;color:#888;margin-bottom:6px">Confidence: ${score.toFixed(0)}/100</div>
+        <div class="strat-tags">
+          <span class="tag ${tagCls}">${tf}</span>
+          <span class="tag ${catCls}">${s.category || '—'}</span>
+        </div>
+        <div class="strat-detail">${s.best_for || s.description || '—'}</div>
+        <div class="strat-risk" style="margin-top:6px">
+          <span style="font-size:9px;color:#888;margin-right:4px">RISK</span>
+          ${[1, 2, 3, 4, 5].map(n => `<div class="risk-dot ${n <= (s.risk_score || 3) ? 'filled' : ''}"></div>`).join('')}
+        </div>
+      </div>`;
+                }).join('');
+            } catch (e) { errMsg('strat-cards', e.message); }
         }
 
         async function loadVolRegimes() {
-            const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
-            const el = document.getElementById('vol-regime-list');
-            loading(el, 'Loading vol regimes…');
+            const el = document.getElementById('vol-regime-panel');
+            loading(el);
+            const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'];
             const results = await Promise.allSettled(assets.map(a => apiFetch(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
             el.innerHTML = results.map(r => {
                 if (r.status !== 'fulfilled') return '';
-                const [asset, vf] = r.value;
-                if (vf.error) return '';
-                const reg = vf.vol_regime || 'fair';
-                const ivp = vf.iv_percentile || 50;
-                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
-                const color = reg === 'cheap' ? '#1a7a3c' : reg === 'expensive' ? '#c0392b' : '#b8860b';
-                return `<div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-        <span style="font-weight:600;font-size:.8rem">${asset}</span>
-        <span style="font-size:.7rem;color:${color};font-weight:700;text-transform:uppercase">${reg} ${fmtP(ivp)}</span>
-      </div>
-      <div class="gauge-bar"><div class="gauge-fill gauge-${reg}" style="width:${Math.min(ivp, 100)}%"></div></div>
-      <div style="display:flex;justify-content:space-between;font-size:.67rem;color:#888;margin-top:2px">
-        <span>GARCH: ${v1d}%</span><span>RV20: ${fmtP(vf.realized_vol_20d)}</span><span>PCR: ${vf.pcr || '—'}</span>
-      </div></div>`;
-            }).join('');
-        }
-
-        function renderTopStrategies(strategies, data) {
-            const el = document.getElementById('top-strategies');
-            if (!strategies.length) { el.innerHTML = '<p style="color:#999;font-size:.8rem">No recommendations available</p>'; return; }
-            const cond = data.condition_analysis || {};
-            el.innerHTML = `<div style="padding:8px;background:#f8f8f8;border-radius:2px;font-size:.73rem;margin-bottom:10px">
-    <strong>${data.regime || '—'}</strong> &nbsp;|&nbsp; ${cond.trend || '—'} &nbsp;|&nbsp; ${cond.volatility_environment || '—'}<br>
-    <span style="color:#555">${cond.overall_outlook || ''}</span></div>` +
-                strategies.map((s, i) => {
-                    const score = s.score || 0;
-                    const sc = score > 70 ? '#1a7a3c' : score > 50 ? '#b8860b' : '#c0392b';
-                    const tf = s.trend_fit || 'neutral';
-                    return `<div class="strat-card ${i === 0 ? 'top' : ''}">
-      <div class="strat-score" style="color:${sc}">${score.toFixed(0)}</div>
-      <div class="strat-name">${s.name}</div>
-      <div class="strat-meta">
-        <span class="tag tag-grey">${s.category || '—'}</span>
-        <span class="tag tag-${tf.includes('bull') ? 'green' : tf.includes('bear') ? 'red' : 'blue'}">${tf}</span>
-      </div>
-      <div style="font-size:.71rem;color:#555;margin-bottom:6px">${s.best_for || s.description || '—'}</div>
-      <button class="outline" style="font-size:.68rem" onclick="calcStrikes('${s.strategy_key}')">Details →</button>
-    </div>`;
-                }).join('');
-        }
-
-        // ── Option Chain ──────────────────────────────────────────────────────────────
-        async function fetchChain() {
-            const sym = document.getElementById('oc-asset').value;
-            const exc = document.getElementById('oc-exchange').value;
-            const exp = document.getElementById('oc-expiry').value;
-            if (!exp) { alert('Enter expiry YYYYMMDD'); return; }
-            loading('ce-table', ''); loading('pe-table', '');
-            try {
-                const d = await apiFetch(`/option-chain?instrument=${sym}&exchange=${exc}&expiry=${exp}`);
-                const chain = d.chain || {};
-                const atm = chain.atm ? chain.atm / 100 : null;
-                document.getElementById('atm-info').textContent =
-                    atm ? `ATM: ${atm.toLocaleString('en-IN')}  |  Spot: ${(chain.cp / 100).toLocaleString('en-IN')}` : '';
-                renderChainTable('ce-table', chain.ce || [], atm);
-                renderChainTable('pe-table', chain.pe || [], atm);
-            } catch (e) { err('ce-table', e.message); }
-        }
-
-        function renderChainTable(id, items, atm) {
-            document.getElementById(id).innerHTML = [...items]
-                .sort((a, b) => (a.sp || 0) - (b.sp || 0)).slice(0, 30).map(i => {
-                    const isAtm = atm && Math.abs(i.sp / 100 - atm) < 50;
-                    const ivColor = i.iv > 0.3 ? '#c0392b' : i.iv > 0.2 ? '#b8860b' : '#1a7a3c';
-                    return `<tr class="${isAtm ? 'atm-row' : ''}">
-        <td><strong>${(i.sp / 100).toLocaleString('en-IN')}</strong></td>
-        <td>${i.ltp != null ? (i.ltp / 100).toFixed(2) : '—'}</td>
-        <td style="color:${ivColor}">${i.iv != null ? (i.iv * 100).toFixed(1) : '—'}</td>
-        <td class="${clr(i.delta)}">${fmt(i.delta, 3)}</td>
-        <td>${fmt(i.gamma, 5)}</td>
-        <td class="${clr(i.theta)}">${fmt(i.theta, 2)}</td>
-        <td>${fmt(i.vega, 2)}</td>
-        <td>${fmtN(i.oi)}</td>
-        <td>${fmtN(i.volume)}</td>
-      </tr>`;
-                }).join('');
-        }
-
-        // ── Volatility ────────────────────────────────────────────────────────────────
-        async function loadVol() {
-            const asset = document.getElementById('vol-asset')?.value || 'NIFTY';
-            loading('vol-kpis', 'Loading…');
-            loading('sarima-result', 'Loading SARIMA forecast…');
-            loading('vol-all-table', '');
-
-            try {
-                const vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
-                if (vf.error) { err('vol-kpis', vf.error); }
-                else {
-                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || 0;
-                const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || 0;
-
-                document.getElementById('vol-kpis').innerHTML = [
-                    { label: 'GARCH 1d', value: v1d + '%', sub: 'Ann: ' + vann + '%', color: parseFloat(v1d) > 2.5 ? '#c0392b' : '#111' },
-                    { label: 'Realized 20d', value: fmtP(vf.realized_vol_20d), sub: '5d: ' + fmtP(vf.realized_vol_5d), color: '#111' },
-                    { label: 'Current IV', value: fmtP(vf.current_iv_pct), sub: 'Pct: ' + fmtP(vf.iv_percentile), color: (vf.iv_percentile || 50) > 70 ? '#c0392b' : '#111' },
-                    { label: 'Vol Risk Prem', value: fmtP(vf.vol_risk_premium), sub: 'PCR: ' + (vf.pcr || '—'), color: (vf.vol_risk_premium || 0) > 0 ? '#c0392b' : '#1a7a3c' },
-                ].map(k => `<div class="kpi"><div class="kpi-label">${k.label}</div>
-      <div class="kpi-value" style="color:${k.color}">${k.value}</div>
-      <div class="kpi-sub">${k.sub}</div></div>`).join('');
-
-                // GARCH chart
-                const models = vf.models || {};
-                const mNames = Object.keys(models);
-                const mVols = mNames.map(m => models[m].vol_1d || 0);
-                const mAics = mNames.map(m => models[m].aic || 0);
-                const bestIdx = mAics.indexOf(Math.min(...mAics));
-                const ctx1 = document.getElementById('garch-chart')?.getContext('2d');
-                if (ctx1) {
-                    if (charts.garch) charts.garch.destroy();
-                    charts.garch = new Chart(ctx1, {
-                        type: 'bar',
-                        data: {
-                            labels: mNames, datasets: [{
-                                label: '1-Day Vol%', data: mVols,
-                                backgroundColor: mNames.map((_, i) => i === bestIdx ? '#111' : '#aaa'), borderRadius: 2
-                            }]
-                        },
-                        options: {
-                            animation: false, plugins: { legend: { display: false } },
-                            scales: { x: { ticks: { color: '#555' } }, y: { ticks: { color: '#555' }, title: { display: true, text: 'Vol %' } } }
-                        }
-                    });
-                }
-
-                // SARIMA
-                const sarima = vf.sarima_forecast || [];
-                const ctx2 = document.getElementById('forecast-chart')?.getContext('2d');
-                if (ctx2) {
-                    if (charts.forecast) charts.forecast.destroy();
-                    charts.forecast = new Chart(ctx2, {
-                        type: 'line',
-                        data: {
-                            labels: ['D+1', 'D+2', 'D+3', 'D+4', 'D+5'],
-                            datasets: [{
-                                label: 'SARIMA Return%', data: sarima,
-                                borderColor: '#111', borderWidth: 2, pointRadius: 5,
-                                pointBackgroundColor: sarima.map(v => v >= 0 ? '#1a7a3c' : '#c0392b'), fill: false
-                            }]
-                        },
-                        options: {
-                            animation: false, plugins: { legend: { labels: { color: '#111' } } },
-                            scales: { x: { ticks: { color: '#555' } }, y: { ticks: { color: '#555' } } }
-                        }
-                    });
-                }
-
-                document.getElementById('sarima-result').innerHTML = sarima.length
-                    ? `<div style="font-size:.78rem;margin-bottom:8px">Model: <strong>${vf.sarima_model || '—'}</strong></div>
-         <div style="display:flex;gap:10px">${sarima.map((v, i) =>
-                        `<div class="kpi" style="flex:1"><div class="kpi-label">Day ${i + 1}</div>
-            <div class="kpi-value ${v >= 0 ? 'up' : 'down'}" style="font-size:1rem">${v >= 0 ? '+' : ''}${v}%</div></div>`
-                    ).join('')}</div>`
-                    : '<p style="color:#999;font-size:.8rem">No SARIMA forecast</p>';
-
-                } // end else (no error)
-            } catch (e) { err('vol-kpis', 'Vol forecast failed: ' + e.message); }
-
-            // All assets table
-            const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
-            const rows = await Promise.allSettled(assets.map(a => apiFetch(`/vol-forecast?symbol=${a}`).then(d => [a, d])));
-            document.getElementById('vol-all-table').innerHTML = rows.map(r => {
-                if (r.status !== 'fulfilled') return `<tr><td>?</td><td colspan="8" style="color:#999">Error</td></tr>`;
                 const [a, vf] = r.value;
-                if (vf.error) return `<tr><td><strong>${a}</strong></td><td colspan="8" style="color:#999">${vf.error}</td></tr>`;
-                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || '—';
-                const vann = vf.ensemble_vol_ann || vf.garch_vol_ann || '—';
-                const reg = vf.vol_regime || 'fair';
-                const rc = reg === 'cheap' ? 'tag-green' : reg === 'expensive' ? 'tag-red' : 'tag-gold';
-                return `<tr>
-      <td><strong>${a}</strong></td>
-      <td>${v1d}</td><td>${vann}</td>
-      <td>${fmtP(vf.realized_vol_20d)}</td>
-      <td>${fmtP(vf.current_iv_pct)}</td>
-      <td>${fmtP(vf.iv_percentile)}</td>
-      <td class="${(vf.vol_risk_premium || 0) > 0 ? 'down' : 'up'}">${fmtP(vf.vol_risk_premium)}</td>
-      <td>${vf.pcr || '—'}</td>
-      <td><span class="tag ${rc}">${reg}</span></td>
-    </tr>`;
+                const v1d = vf.ensemble_vol_1d || vf.garch_vol_1d || 0;
+                const rv20 = vf.realized_vol_20d || 0;
+                const pct = Math.min((v1d / 4) * 100, 100);
+                const cls = v1d > 2.5 ? 'vg-high' : v1d > 1.5 ? 'vg-mid' : 'vg-low';
+                const label = v1d > 2.5 ? 'HIGH' : v1d > 1.5 ? 'ELEVATED' : 'NORMAL';
+                return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+        <span style="font-weight:600;font-size:11px">${a}</span>
+        <span style="font-size:10px;color:#888">${label} · GARCH ${fmtP(v1d)} · RV20 ${fmtP(rv20)}</span>
+      </div>
+      <div class="vol-gauge"><div class="vol-gauge-fill ${cls}" style="width:${pct}%"></div></div>
+    </div>`;
             }).join('');
         }
 
-        const fetchVol = loadVol;
-
-        // ── Strategy ──────────────────────────────────────────────────────────────────
+        // ── Strategy Engine ───────────────────────────────────────────────────────────
         async function loadStrategy() {
             const asset = document.getElementById('st-asset')?.value || 'NIFTY';
             const dte = document.getElementById('st-dte')?.value || '7';
-            loading('regime-display', '');
-            loading('strategy-list', 'Analysing market conditions…');
+            loading('st-context'); loading('st-reasoning'); loading('st-cards');
+
+            // Get real data first
+            let prices = [], rv20 = 0, rv5 = 0, ret5 = 0, ret20 = 0, garch1d = 0;
+            try {
+                const h = await apiFetch(`/historical?symbol=${asset}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
+                const closes = h.result?.[0]?.values?.[0]?.[asset]?.close || [];
+                prices = closes.map(p => (p.value || p.v || 0) / 100);
+                if (prices.length > 1) {
+                    const rets = prices.slice(1).map((p, i) => Math.log(p / prices[i]) * 100);
+                    const std = arr => { const m = arr.reduce((a, b) => a + b, 0) / arr.length; return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / arr.length); };
+                    rv20 = std(rets.slice(-20)) * Math.sqrt(252);
+                    rv5 = std(rets.slice(-5)) * Math.sqrt(252);
+                    ret5 = prices.length >= 5 ? (prices.at(-1) - prices.at(-5)) / prices.at(-5) * 100 : 0;
+                    ret20 = prices.length >= 20 ? (prices.at(-1) - prices.at(-20)) / prices.at(-20) * 100 : 0;
+                }
+            } catch (e) { }
+
+            try {
+                const vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
+                garch1d = vf.ensemble_vol_1d || vf.garch_vol_1d || 0;
+            } catch (e) { }
+
+            const regime = determineRegime(ret5, ret20, rv5, rv20, garch1d);
+            const spot = prices.at(-1) || 0;
+            const dd = prices.length ? (spot - Math.max(...prices)) / Math.max(...prices) * 100 : 0;
+
+            // Market context
+            document.getElementById('st-context').innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 12px;background:#fafafa;border:1px solid #e8e8e8;border-radius:2px;margin-bottom:10px">
+      <span class="regime regime-${regime.css}">${regime.label}</span>
+      <span style="font-size:11px">Spot: <strong>${spot.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+      <span style="font-size:11px">5d: <strong class="${clr(ret5)}">${sign(ret5)}${fmtP(ret5)}</strong></span>
+      <span style="font-size:11px">20d: <strong class="${clr(ret20)}">${sign(ret20)}${fmtP(ret20)}</strong></span>
+      <span style="font-size:11px">GARCH: <strong>${fmtP(garch1d)}</strong></span>
+      <span style="font-size:11px">RV20: <strong>${fmtP(rv20)}</strong></span>
+      <span style="font-size:11px">DD: <strong class="down">${fmtP(dd)}</strong></span>
+      <span style="font-size:11px">DTE: <strong>${dte}d</strong></span>
+    </div>`;
+
+            // Real data reasoning
+            const volPremium = garch1d > rv20 ? 'GARCH forecasts higher vol than realized — vol likely to stay elevated' : 'GARCH below realized — vol may mean-revert lower';
+            const volSkew = rv5 > rv20 * 1.3 ? 'Short-term vol (5d) >> Long-term (20d) — vol spike in progress' : 'Vol term structure normal';
+            const trendStr = ret20 < -8 ? 'Strong downtrend (-8%+ in 20d)' : ret20 < -3 ? 'Moderate downtrend' : ret20 > 8 ? 'Strong uptrend' : ret20 > 3 ? 'Moderate uptrend' : 'Sideways/ranging';
+
+            document.getElementById('st-reasoning').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:11px">
+      <div class="risk-panel">
+        <div style="font-weight:700;margin-bottom:6px;font-size:10px;text-transform:uppercase;letter-spacing:.06em">Trend Analysis</div>
+        <div class="risk-row"><span class="risk-label">5d momentum</span><span class="risk-value ${clr(ret5)}">${sign(ret5)}${fmtP(ret5)}</span></div>
+        <div class="risk-row"><span class="risk-label">20d momentum</span><span class="risk-value ${clr(ret20)}">${sign(ret20)}${fmtP(ret20)}</span></div>
+        <div class="risk-row"><span class="risk-label">Drawdown</span><span class="risk-value down">${fmtP(dd)}</span></div>
+        <div style="margin-top:6px;color:#555;font-size:10px">${trendStr}</div>
+      </div>
+      <div class="risk-panel">
+        <div style="font-weight:700;margin-bottom:6px;font-size:10px;text-transform:uppercase;letter-spacing:.06em">Volatility Analysis</div>
+        <div class="risk-row"><span class="risk-label">GARCH 1d</span><span class="risk-value">${fmtP(garch1d)}</span></div>
+        <div class="risk-row"><span class="risk-label">Realized 20d</span><span class="risk-value">${fmtP(rv20)}</span></div>
+        <div class="risk-row"><span class="risk-label">Realized 5d</span><span class="risk-value ${rv5 > rv20 * 1.3 ? 'down' : ''}">${fmtP(rv5)}</span></div>
+        <div style="margin-top:6px;color:#555;font-size:10px">${volSkew}</div>
+      </div>
+      <div class="risk-panel">
+        <div style="font-weight:700;margin-bottom:6px;font-size:10px;text-transform:uppercase;letter-spacing:.06em">Strategy Logic</div>
+        <div style="color:#555;font-size:10px;line-height:1.7">${regime.description}<br><br>${volPremium}</div>
+      </div>
+    </div>`;
+
+            // Get strategy recommendations
             try {
                 const d = await apiFetch(`/strategy-recommend?asset=${asset}&dte=${dte}`);
-                const cond = d.condition_analysis || {};
-                document.getElementById('regime-display').innerHTML = `
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-        <span class="regime-badge regime-${(d.regime || 'uncertain').replace(/_/g, '-')}">${d.regime || '—'}</span>
-        <span style="font-size:.73rem">Trend: <strong>${cond.trend || '—'}</strong></span>
-        <span style="font-size:.73rem">Vol: <strong>${cond.volatility_environment || '—'}</strong></span>
-        <span style="font-size:.73rem">Spot Δ: <strong class="${clr(d.spot_change_pct)}">${fmt(d.spot_change_pct)}%</strong></span>
-        <span style="font-size:.73rem">IV: <strong>${fmt(d.iv_level)}%</strong></span>
-      </div>
-      <div style="font-size:.71rem;color:#555;padding:6px 8px;background:#f8f8f8;border-radius:2px">${cond.overall_outlook || ''}</div>`;
-
-                const strats = d.top_recommendations || [];
-                document.getElementById('strategy-list').innerHTML = strats.map((s, i) => {
+                const top = d.top_recommendations || [];
+                document.getElementById('st-cards').innerHTML = top.slice(0, 6).map((s, i) => {
                     const score = s.score || 0;
-                    const sc = score > 70 ? '#1a7a3c' : score > 50 ? '#b8860b' : '#c0392b';
                     const tf = s.trend_fit || 'neutral';
-                    return `<div class="strat-card ${i === 0 ? 'top' : ''}">
-        <div class="strat-score" style="color:${sc}">${score.toFixed(0)}</div>
+                    const tagCls = tf.includes('bull') ? 'tag-bull' : tf.includes('bear') ? 'tag-bear' : 'tag-neutral';
+                    const catCls = s.category === 'income' ? 'tag-income' : s.category === 'volatility' ? 'tag-vol' : 'tag-neutral';
+                    return `<div class="strat-card ${i === 0 ? 'top-pick' : ''}" onclick="showStratDetail('${s.strategy_key}','${asset}')">
         <div class="strat-name">${s.name}</div>
-        <div class="strat-meta">
-          <span class="tag tag-grey">${s.category || '—'}</span>
-          <span class="tag tag-${tf.includes('bull') ? 'green' : tf.includes('bear') ? 'red' : 'blue'}">${tf}</span>
-          <span class="tag tag-grey">Rank #${s.rank || i + 1}</span>
+        <div class="strat-score-bar"><div class="strat-score-fill" style="width:${score}%"></div></div>
+        <div style="font-size:9px;color:#888;margin-bottom:6px">Score: ${score.toFixed(0)}/100</div>
+        <div class="strat-tags">
+          <span class="tag ${tagCls}">${tf}</span>
+          <span class="tag ${catCls}">${s.category || '—'}</span>
         </div>
-        <div style="font-size:.71rem;color:#555;margin-bottom:6px">
-          <strong>Best for:</strong> ${s.best_for || s.description || '—'}<br>
-          <strong>Risk:</strong> ${s.risk_profile || '—'}
+        <div class="strat-detail" style="margin-bottom:6px">${s.best_for || s.description || '—'}</div>
+        <div class="strat-detail"><strong>Risk:</strong> ${s.risk_profile || '—'}</div>
+        <div class="strat-risk" style="margin-top:6px">
+          <span style="font-size:9px;color:#888;margin-right:4px">RISK</span>
+          ${[1, 2, 3, 4, 5].map(n => `<div class="risk-dot ${n <= (s.risk_score || 3) ? 'filled' : ''}"></div>`).join('')}
         </div>
-        <button class="outline" style="font-size:.68rem" onclick="calcStrikes('${s.strategy_key}','${asset}')">Details →</button>
+        <div style="margin-top:8px;font-size:10px;color:#0066cc;cursor:pointer">→ View details & strikes</div>
       </div>`;
                 }).join('');
-            } catch (e) { err('strategy-list', 'Strategy failed: ' + e.message); }
+            } catch (e) { errMsg('st-cards', e.message); }
         }
 
+        async function showStratDetail(key, asset) {
+            const panel = document.getElementById('st-detail');
+            panel.style.display = 'block';
+            loading('st-detail-body');
+            try {
+                const d = await apiFetch(`/strategy-details/${key}?asset=${asset}`);
+                document.getElementById('st-detail-title').textContent = d.name || key;
+                document.getElementById('st-detail-body').innerHTML = `
+      <div class="g2">
+        <div>
+          <div class="risk-panel">
+            <div class="risk-row"><span class="risk-label">Category</span><span class="risk-value">${d.category || '—'}</span></div>
+            <div class="risk-row"><span class="risk-label">Best for</span><span class="risk-value" style="max-width:200px;text-align:right;font-size:10px">${d.best_for || '—'}</span></div>
+            <div class="risk-row"><span class="risk-label">Max Loss</span><span class="risk-value down">${d.risk_profile || '—'}</span></div>
+            <div class="risk-row"><span class="risk-label">Max Profit</span><span class="risk-value up">${d.max_profit || '—'}</span></div>
+            <div class="risk-row"><span class="risk-label">Breakeven</span><span class="risk-value">${d.breakeven || '—'}</span></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#555;line-height:1.8;padding:10px 12px;background:#fafafa;border:1px solid #e8e8e8;border-radius:2px">
+          <strong>When to use:</strong> ${d.description || d.best_for || '—'}<br><br>
+          <strong>Risk management:</strong> Set stop-loss at 50% of max loss. Exit if underlying moves against position by more than 1 ATR. Monitor delta daily.
+        </div>
+      </div>`;
+                panel.scrollIntoView({ behavior: 'smooth' });
+            } catch (e) { errMsg('st-detail-body', e.message); }
+        }
+
+        const loadStrategy = loadStrategy;
         const fetchStrategy = loadStrategy;
 
-        async function calcStrikes(stratKey, asset) {
-            asset = asset || document.getElementById('st-asset')?.value || 'NIFTY';
-            const card = document.getElementById('strike-calc-card');
-            card.style.display = 'block';
-            loading('strike-result', 'Loading strategy details…');
-            try {
-                const d = await apiFetch(`/strategy-details/${stratKey}?asset=${asset}`);
-                document.getElementById('strike-result').innerHTML = `
-      <div style="margin-bottom:10px"><strong style="font-size:.95rem">${d.name || stratKey}</strong>
-        <span class="tag tag-grey" style="margin-left:8px">${d.category || ''}</span></div>
-      <div style="font-size:.78rem;color:#555;line-height:1.9">
-        <div>${d.description || ''}</div>
-        <div><strong>Best for:</strong> ${d.best_for || '—'}</div>
-        <div><strong>Risk:</strong> ${d.risk_profile || '—'}</div>
-        <div><strong>Max Profit:</strong> ${d.max_profit || '—'}</div>
-        <div><strong>Breakeven:</strong> ${d.breakeven || '—'}</div>
-      </div>`;
-            } catch (e) { err('strike-result', e.message); }
-            card.scrollIntoView({ behavior: 'smooth' });
-        }
+// ── Volatility ────────────────────────────────────────────────────────────────
+async function loadVol() {
+  const asset = document.getElementById('vol-asset')?.value||'NIFTY';
+  loading('vol-kpis'); loading('vol-all-panel'); loading('vol-interpretation');
 
-        // ── ML Signals ────────────────────────────────────────────────────────────────
-        async function loadSignals() {
-            const asset = document.getElementById('sig-asset')?.value || 'NIFTY';
-            loading('ce-signals', ''); loading('pe-signals', '');
-            try {
-                const d = await apiFetch(`/signals?asset=${asset}`);
-                renderSignalTable('ce-signals', d.CE || [], '#1a7a3c');
-                renderSignalTable('pe-signals', d.PE || [], '#c0392b');
-            } catch (e) { err('ce-signals', e.message); err('pe-signals', ''); }
-        }
+  let vf={}, prices=[], rv20=0, rv5=0;
+  try {
+    vf = await apiFetch(`/vol-forecast?symbol=${asset}`);
+    const h = await apiFetch(`/historical?symbol=${asset}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
+    const closes = h.result?.[0]?.values?.[0]?.[asset]?.close||[];
+    prices = closes.map(p=>(p.value||p.v||0)/100);
+    if (prices.length>1) {
+      const rets = prices.slice(1).map((p,i)=>Math.log(p/prices[i])*100);
+      const std = arr=>{ const m=arr.reduce((a,b)=>a+b,0)/arr.length; return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length); };
+      rv20 = std(rets.slice(-20))*Math.sqrt(252);
+      rv5  = std(rets.slice(-5))*Math.sqrt(252);
+    }
+  } catch(e){}
 
-        const fetchSignals = loadSignals;
+  const v1d  = vf.ensemble_vol_1d||vf.garch_vol_1d||0;
+  const vann = vf.ensemble_vol_ann||vf.garch_vol_ann||0;
 
-        function renderSignalTable(id, rows, color) {
-            if (!rows.length) { document.getElementById(id).innerHTML = '<tr><td colspan="6" style="color:#999">No signals</td></tr>'; return; }
-            document.getElementById(id).innerHTML = rows.map(r => {
-                const score = r.signal_score || 0;
-                const bar = `<div style="display:flex;align-items:center;gap:5px">
-      <div style="width:${Math.round(score * 60)}px;height:5px;background:${color};border-radius:3px;min-width:2px"></div>
-      <span style="font-weight:700;font-size:.8rem">${(score * 100).toFixed(0)}</span></div>`;
-                const strike = r.strike ? (r.strike / 100).toLocaleString('en-IN') : '—';
-                const ltp = r.ltp ? r.ltp.toFixed(2) : '—';
-                const iv = r.iv ? (r.iv * 100).toFixed(1) + '%' : '—';
-                return `<tr>
-      <td>${strike}</td><td>${ltp}</td><td>${iv}</td>
-      <td class="${clr(r.delta)}">${fmt(r.delta, 3)}</td>
-      <td>${fmtN(r.oi)}</td><td>${bar}</td>
+  document.getElementById('vol-kpis').innerHTML = [
+    {label:'GARCH 1d',    value:fmtP(v1d),  sub:'Ann: '+fmtP(vann),  cls:v1d>2.5?'alert':''},
+    {label:'Realized 20d',value:fmtP(rv20), sub:'5d: '+fmtP(rv5),    cls:rv5>rv20*1.3?'alert':''},
+    {label:'Vol Premium',  value:v1d&&rv20 ? fmtP(v1d-rv20) : '—', sub:v1d>rv20?'GARCH > RV':'GARCH < RV', cls:''},
+    {label:'Vol Regime',   value:v1d>2.5?'HIGH':v1d>1.5?'ELEVATED':'NORMAL', sub:'Based on GARCH', cls:v1d>2.5?'alert':''},
+  ].map(k=>`<div class="kpi ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // GARCH chart
+  const models = vf.models||{};
+  const mNames = Object.keys(models);
+  const mVols  = mNames.map(m=>models[m].vol_1d||0);
+  const ctx1 = document.getElementById('garch-chart')?.getContext('2d');
+  if (ctx1 && mNames.length) {
+    if (charts.garch) charts.garch.destroy();
+    charts.garch = new Chart(ctx1, {
+      type:'bar',
+      data:{labels:mNames.map(n=>n.toUpperCase()),datasets:[{label:'1-Day Vol%',data:mVols,backgroundColor:'#111',borderRadius:1}]},
+      options:{animation:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#888',font:{size:10}}},y:{ticks:{color:'#888',font:{size:10}},title:{display:true,text:'Vol %',color:'#888',font:{size:10}}}}}
+    });
+  }
+
+  // All assets vol
+  const assets = ['NIFTY','BANKNIFTY','FINNIFTY','MIDCPNIFTY'];
+  const rows = await Promise.allSettled(assets.map(a=>apiFetch(`/vol-forecast?symbol=${a}`).then(d=>[a,d])));
+  document.getElementById('vol-all-panel').innerHTML = `<table class="tbl"><thead><tr><th>Asset</th><th>GARCH 1d</th><th>Ann Vol</th><th>RV 20d</th><th>Regime</th></tr></thead><tbody>` +
+    rows.map(r=>{
+      if (r.status!=='fulfilled') return '';
+      const [a,v] = r.value;
+      const v1 = v.ensemble_vol_1d||v.garch_vol_1d||0;
+      const va = v.ensemble_vol_ann||v.garch_vol_ann||0;
+      const rv = v.realized_vol_20d||0;
+      const reg = v1>2.5?'HIGH':v1>1.5?'ELEVATED':'NORMAL';
+      return `<tr><td><strong>${a}</strong></td><td class="${v1>2.5?'down':''}">${fmtP(v1)}</td><td>${fmtP(va)}</td><td>${fmtP(rv)}</td><td>${reg}</td></tr>`;
+    }).join('') + '</tbody></table>';
+
+  // Interpretation
+  const interp = v1d>2.5
+    ? `<strong>High volatility environment (${fmtP(v1d)} daily).</strong> Options are expensive. Favour selling premium: short straddles, iron condors, covered calls. Avoid buying options unless for protection.`
+    : v1d>1.5
+    ? `<strong>Elevated volatility (${fmtP(v1d)} daily).</strong> Balanced environment. Both buying and selling strategies viable. Prefer defined-risk spreads.`
+    : `<strong>Low volatility (${fmtP(v1d)} daily).</strong> Options are cheap. Favour buying: long straddles, long strangles, calendar spreads. Good time to buy protection.`;
+  document.getElementById('vol-interpretation').innerHTML = `<div style="font-size:11px;line-height:1.8;color:#333">${interp}</div>`;
+}
+
+const fetchVol = loadVol;
+
+// ── Option Chain ──────────────────────────────────────────────────────────────
+async function loadChain() {
+  const sym = document.getElementById('oc-asset').value;
+  const exc = document.getElementById('oc-exchange').value;
+  const exp = document.getElementById('oc-expiry').value;
+  if (!exp) { alert('Enter expiry YYYYMMDD'); return; }
+  loading('ce-table',''); loading('pe-table','');
+  try {
+    const d = await apiFetch(`/option-chain?instrument=${sym}&exchange=${exc}&expiry=${exp}`);
+    const chain = d.chain||{};
+    const atm = chain.atm ? chain.atm/100 : null;
+    const spot = chain.cp ? chain.cp/100 : null;
+    document.getElementById('chain-meta').textContent =
+      atm ? `ATM: ${atm.toLocaleString('en-IN')} | Spot: ${spot?.toLocaleString('en-IN')} | Expiry: ${exp}` : '';
+    renderChainTable('ce-table', chain.ce||[], atm, 'ce-row');
+    renderChainTable('pe-table', chain.pe||[], atm, 'pe-row');
+  } catch(e) { errMsg('ce-table', e.message); }
+}
+
+function renderChainTable(id, items, atm, rowCls) {
+  document.getElementById(id).innerHTML = [...items].sort((a,b)=>(a.sp||0)-(b.sp||0)).slice(0,30).map(i=>{
+    const strike = (i.sp/100).toFixed(0);
+    const isAtm  = atm && Math.abs(i.sp/100-atm)<50;
+    const ltp    = i.ltp!=null ? (i.ltp/100).toFixed(2) : '—';
+    const iv     = i.iv!=null  ? (i.iv*100).toFixed(1)  : '—';
+    const ivColor= i.iv>0.3?'down':i.iv>0.2?'neutral':'up';
+    return `<tr class="${isAtm?'atm':rowCls}">
+      <td><strong>${Number(strike).toLocaleString('en-IN')}</strong></td>
+      <td>${ltp}</td><td class="${ivColor}">${iv}</td>
+      <td class="${clr(i.delta)}">${fmt(i.delta,3)}</td>
+      <td>${fmt(i.gamma,5)}</td>
+      <td class="${clr(i.theta)}">${fmt(i.theta,2)}</td>
+      <td>${fmt(i.vega,2)}</td>
+      <td>${fmtN(i.oi)}</td>
+      <td>${fmtN(i.volume)}</td>
     </tr>`;
-            }).join('');
-        }
+  }).join('');
+}
 
-        async function fetchAllSignals() {
-            const card = document.getElementById('all-signals-card');
-            card.style.display = 'block';
-            loading('all-signals-content', 'Loading all assets…');
-            try {
-                const d = await apiFetch('/signals/all');
-                document.getElementById('all-signals-content').innerHTML = Object.entries(d).map(([asset, sigs]) => {
-                    if (sigs.error) return `<div style="padding:6px 0;border-bottom:1px solid #f0f0f0"><strong>${asset}</strong>: <span style="color:#999">${sigs.error}</span></div>`;
-                    const ce = (sigs.CE || [])[0], pe = (sigs.PE || [])[0];
-                    return `<div style="display:flex;gap:16px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">
-        <span style="font-weight:700;width:100px">${asset}</span>
-        <span style="color:#1a7a3c;font-size:.75rem">CE K=${ce?.strike ? (ce.strike / 100).toLocaleString() : '—'} score=${ce ? ((ce.signal_score || 0) * 100).toFixed(0) : '—'}</span>
-        <span style="color:#c0392b;font-size:.75rem">PE K=${pe?.strike ? (pe.strike / 100).toLocaleString() : '—'} score=${pe ? ((pe.signal_score || 0) * 100).toFixed(0) : '—'}</span>
-      </div>`;
-                }).join('');
-            } catch (e) { err('all-signals-content', e.message); }
-        }
+// ── ML Signals ────────────────────────────────────────────────────────────────
+async function loadSignals() {
+  const asset = document.getElementById('sig-asset')?.value||'NIFTY';
+  loading('ce-signals',''); loading('pe-signals','');
+  try {
+    const d = await apiFetch(`/signals?asset=${asset}`);
+    renderSignalTable('ce-signals', d.CE||[], '#00aa44');
+    renderSignalTable('pe-signals', d.PE||[], '#cc2200');
+  } catch(e) { errMsg('ce-signals', e.message); }
+}
 
-        // ── Greeks ────────────────────────────────────────────────────────────────────
-        async function loadGreeks() {
-            const asset = document.getElementById('gr-asset')?.value || 'NIFTY';
-            try {
-                const d = await apiFetch(`/iv-surface?asset=${asset}`);
-                if (!Array.isArray(d) || !d.length) { err('iv-smile-chart', 'No data'); return; }
-                const ce = d.filter(x => x.option_type === 'CE').sort((a, b) => a.strike - b.strike);
-                const pe = d.filter(x => x.option_type === 'PE').sort((a, b) => a.strike - b.strike);
-                const labels = [...new Set(d.map(x => (x.strike / 100).toFixed(0)))];
-                const get = (arr, f) => arr.map(x => x[f] != null ? x[f] : null);
+function renderSignalTable(id, rows, color) {
+  if (!rows.length) { document.getElementById(id).innerHTML='<tr><td colspan="7" style="color:#888;padding:8px">No signals — run collect_data.py during market hours</td></tr>'; return; }
+  document.getElementById(id).innerHTML = rows.map(r=>{
+    const score = (r.signal_score||0)*100;
+    const action = score>70?'<span class="signal-high">BUY</span>':score>55?'WATCH':'<span style="color:#888">SKIP</span>';
+    const strike = r.strike ? (r.strike/100).toLocaleString('en-IN') : '—';
+    return `<tr>
+      <td>${strike}</td>
+      <td>${r.ltp?.toFixed(2)||'—'}</td>
+      <td>${r.iv?(r.iv*100).toFixed(1)+'%':'—'}</td>
+      <td class="${clr(r.delta)}">${fmt(r.delta,3)}</td>
+      <td>${fmtN(r.oi)}</td>
+      <td><div style="display:flex;align-items:center;gap:5px"><div style="width:${Math.round(score*0.5)}px;height:4px;background:${color};border-radius:2px;min-width:2px"></div>${score.toFixed(0)}</div></td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
 
-                function mkChart(id, label, ceD, peD) {
-                    const ctx = document.getElementById(id)?.getContext('2d');
-                    if (!ctx) return;
-                    if (charts[id]) charts[id].destroy();
-                    charts[id] = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels, datasets: [
-                                { label: 'CE ' + label, data: ceD, borderColor: '#1a7a3c', borderWidth: 1.5, pointRadius: 2, fill: false },
-                                { label: 'PE ' + label, data: peD, borderColor: '#c0392b', borderWidth: 1.5, pointRadius: 2, fill: false },
-                            ]
-                        },
-                        options: {
-                            animation: false, plugins: { legend: { labels: { color: '#111', font: { size: 10 } } } },
-                            scales: {
-                                x: { ticks: { color: '#555', maxTicksLimit: 8 }, grid: { color: '#f0f0f0' } },
-                                y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' } }
-                            }
-                        }
-                    });
-                }
-                mkChart('delta-chart', 'Delta', get(ce, 'delta'), get(pe, 'delta'));
-                mkChart('gamma-chart', 'Gamma', get(ce, 'gamma'), get(pe, 'gamma'));
-                mkChart('theta-chart', 'Theta', get(ce, 'theta'), get(pe, 'theta'));
-                mkChart('vega-chart', 'Vega', get(ce, 'vega'), get(pe, 'vega'));
+async function loadAllSignals() {
+  const panel = document.getElementById('all-signals-panel');
+  panel.style.display='block';
+  loading('all-signals-body');
+  try {
+    const d = await apiFetch('/signals/all');
+    document.getElementById('all-signals-body').innerHTML = `<table class="tbl"><thead><tr><th>Asset</th><th>Top CE Strike</th><th>CE Score</th><th>Top PE Strike</th><th>PE Score</th><th>Signal</th></tr></thead><tbody>` +
+      Object.entries(d).map(([a,sigs])=>{
+        if (sigs.error) return `<tr><td>${a}</td><td colspan="5" style="color:#888">${sigs.error}</td></tr>`;
+        const ce=(sigs.CE||[])[0], pe=(sigs.PE||[])[0];
+        const ceScore=(ce?.signal_score||0)*100, peScore=(pe?.signal_score||0)*100;
+        const signal = ceScore>70?'<span class="up">CALL BUY</span>':peScore>70?'<span class="down">PUT BUY</span>':'<span style="color:#888">NEUTRAL</span>';
+        return `<tr><td><strong>${a}</strong></td>
+          <td>${ce?.strike?(ce.strike/100).toLocaleString():'—'}</td>
+          <td>${ceScore.toFixed(0)}</td>
+          <td>${pe?.strike?(pe.strike/100).toLocaleString():'—'}</td>
+          <td>${peScore.toFixed(0)}</td>
+          <td>${signal}</td></tr>`;
+      }).join('') + '</tbody></table>';
+  } catch(e) { errMsg('all-signals-body', e.message); }
+}
 
-                const ctx = document.getElementById('iv-smile-chart')?.getContext('2d');
-                if (ctx) {
-                    if (charts.iv) charts.iv.destroy();
-                    charts.iv = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels, datasets: [
-                                { label: 'CE IV%', data: ce.map(x => x.iv ? x.iv * 100 : null), borderColor: '#1a7a3c', borderWidth: 2, pointRadius: 3, fill: false },
-                                { label: 'PE IV%', data: pe.map(x => x.iv ? x.iv * 100 : null), borderColor: '#c0392b', borderWidth: 2, pointRadius: 3, fill: false },
-                            ]
-                        },
-                        options: {
-                            animation: false, plugins: { legend: { labels: { color: '#111' } } },
-                            scales: {
-                                x: { ticks: { color: '#555', maxTicksLimit: 10 }, grid: { color: '#f0f0f0' } },
-                                y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' }, title: { display: true, text: 'IV %' } }
-                            }
-                        }
-                    });
-                }
-            } catch (e) { err('iv-smile-chart', 'Greeks failed: ' + e.message); }
-        }
+const fetchSignals = loadSignals;
 
-        const fetchGreeks = loadGreeks;
+// ── Greeks ────────────────────────────────────────────────────────────────────
+async function loadGreeks() {
+  const asset = document.getElementById('gr-asset')?.value||'NIFTY';
+  try {
+    const d = await apiFetch(`/iv-surface?asset=${asset}`);
+    if (!Array.isArray(d)||!d.length) return;
+    const ce = d.filter(x=>x.option_type==='CE').sort((a,b)=>a.strike-b.strike);
+    const pe = d.filter(x=>x.option_type==='PE').sort((a,b)=>a.strike-b.strike);
+    const labels = [...new Set(d.map(x=>(x.strike/100).toFixed(0)))];
+    const get = (arr,f)=>arr.map(x=>x[f]!=null?x[f]:null);
 
-        // ── Historical ────────────────────────────────────────────────────────────────
-        async function loadHistory() {
-            const sym = document.getElementById('h-asset')?.value || 'NIFTY';
-            const interval = document.getElementById('h-interval')?.value || '1d';
-            const start = document.getElementById('h-start')?.value || '2025-01-01T03:45:00.000Z';
-            const ctx = document.getElementById('hist-chart')?.getContext('2d');
-            if (!ctx) return;
-            try {
-                const d = await apiFetch(`/historical?symbol=${sym}&interval=${interval}&start=${encodeURIComponent(start)}&fields=open,high,low,close,tick_volume`);
-                const vals = d.result?.[0]?.values?.[0]?.[sym];
-                const closes = vals?.close || [];
-                if (!closes.length) { err('hist-chart', 'No historical data'); return; }
-                const labels = closes.map(p => {
-                    const dt = new Date((p.ts || p.timestamp) / 1e6);
-                    return interval === '1d' || interval === '1w'
-                        ? dt.toLocaleDateString('en-IN')
-                        : dt.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                });
-                const data = closes.map(p => ((p.v || p.value) / 100).toFixed(2));
-                if (charts.hist) charts.hist.destroy();
-                charts.hist = new Chart(ctx, {
-                    type: 'line',
-                    data: { labels, datasets: [{ label: sym + ' Close', data, borderColor: '#111', borderWidth: 1.5, pointRadius: 0, fill: false }] },
-                    options: {
-                        animation: false, plugins: { legend: { labels: { color: '#111' } } },
-                        scales: {
-                            x: { ticks: { color: '#555', maxTicksLimit: 12 }, grid: { color: '#f0f0f0' } },
-                            y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' } }
-                        }
-                    }
-                });
-            } catch (e) { err('hist-chart', 'Historical failed: ' + e.message); }
-            loadNormReturns();
-        }
+    function mkChart(id, ceD, peD, label, yLabel) {
+      const ctx = document.getElementById(id)?.getContext('2d');
+      if (!ctx) return;
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart(ctx, {
+        type:'line',
+        data:{labels, datasets:[
+          {label:'CE '+label, data:ceD, borderColor:'#00aa44', borderWidth:1.5, pointRadius:1, fill:false},
+          {label:'PE '+label, data:peD, borderColor:'#cc2200', borderWidth:1.5, pointRadius:1, fill:false},
+        ]},
+        options:{animation:false, plugins:{legend:{labels:{color:'#888',font:{size:10}}}},
+          scales:{x:{ticks:{color:'#888',maxTicksLimit:8,font:{size:10}},grid:{color:'#f5f5f5'}},
+                  y:{ticks:{color:'#888',font:{size:10}},grid:{color:'#f5f5f5'},title:{display:true,text:yLabel,color:'#888',font:{size:10}}}}}
+      });
+    }
+    mkChart('iv-chart',    ce.map(x=>x.iv?x.iv*100:null), pe.map(x=>x.iv?x.iv*100:null), 'IV', 'IV %');
+    mkChart('delta-chart', get(ce,'delta'), get(pe,'delta'), 'Delta', 'Delta');
+    mkChart('gamma-chart', get(ce,'gamma'), get(pe,'gamma'), 'Gamma', 'Gamma');
+    mkChart('theta-chart', get(ce,'theta'), get(pe,'theta'), 'Theta', 'Theta');
+  } catch(e) {}
+}
 
-        const fetchHistorical = loadHistory;
+const fetchGreeks = loadGreeks;
 
-        async function loadNormReturns() {
-            const assets = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
-            const colors = { NIFTY: '#111', BANKNIFTY: '#c0392b', FINNIFTY: '#1a7a3c', MIDCPNIFTY: '#2471a3', SENSEX: '#7d3c98', BANKEX: '#d35400' };
-            const datasets = [];
-            for (const a of assets) {
-                try {
-                    const exc = ['SENSEX', 'BANKEX'].includes(a) ? 'BSE' : 'NSE';
-                    const d = await apiFetch(`/historical?symbol=${a}&exchange=${exc}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
-                    const closes = d.result?.[0]?.values?.[0]?.[a]?.close || [];
-                    if (!closes.length) continue;
-                    const base = closes[0].v || closes[0].value;
-                    datasets.push({
-                        label: a, data: closes.map(p => (((p.v || p.value) / base) * 100).toFixed(2)),
-                        borderColor: colors[a], borderWidth: 1.5, pointRadius: 0, fill: false
-                    });
-                } catch (e) { }
-            }
-            if (!datasets.length) return;
-            const ctx = document.getElementById('norm-chart')?.getContext('2d');
-            if (!ctx) return;
-            if (charts.norm) charts.norm.destroy();
-            charts.norm = new Chart(ctx, {
-                type: 'line',
-                data: { labels: Array.from({ length: Math.max(...datasets.map(d => d.data.length)) }, (_, i) => i + 1), datasets },
-                options: {
-                    animation: false, plugins: { legend: { labels: { color: '#111', font: { size: 10 } } } },
-                    scales: {
-                        x: { ticks: { color: '#555', maxTicksLimit: 10 }, grid: { color: '#f0f0f0' } },
-                        y: { ticks: { color: '#555' }, grid: { color: '#f0f0f0' } }
-                    }
-                }
-            });
-        }
+// ── Historical ────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const sym      = document.getElementById('h-asset')?.value||'NIFTY';
+  const interval = document.getElementById('h-interval')?.value||'1d';
+  const start    = document.getElementById('h-start')?.value||'2025-01-01T03:45:00.000Z';
+  try {
+    const d = await apiFetch(`/historical?symbol=${sym}&interval=${interval}&start=${encodeURIComponent(start)}&fields=open,high,low,close,tick_volume`);
+    const closes = d.result?.[0]?.values?.[0]?.[sym]?.close||[];
+    if (!closes.length) return;
+    const labels = closes.map(p=>{
+      const dt = new Date((p.ts||p.timestamp)/1e6);
+      return interval==='1d'||interval==='1w' ? dt.toLocaleDateString('en-IN') : dt.toLocaleString('en-IN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    });
+    const data = closes.map(p=>((p.v||p.value)/100).toFixed(2));
+    const ctx = document.getElementById('hist-chart')?.getContext('2d');
+    if (ctx) {
+      if (charts.hist) charts.hist.destroy();
+      charts.hist = new Chart(ctx, {
+        type:'line',
+        data:{labels, datasets:[{label:sym, data, borderColor:'#111', borderWidth:1.5, pointRadius:0, fill:false}]},
+        options:{animation:false, plugins:{legend:{labels:{color:'#888',font:{size:10}}}},
+          scales:{x:{ticks:{color:'#888',maxTicksLimit:12,font:{size:10}},grid:{color:'#f5f5f5'}},
+                  y:{ticks:{color:'#888',font:{size:10}},grid:{color:'#f5f5f5'}}}}
+      });
+    }
+  } catch(e){}
+  loadNormReturns();
+}
 
-        // ── Auto-refresh ──────────────────────────────────────────────────────────────
-        function startAutoRefresh() {
-            setInterval(() => {
-                if (mktStatus === 'open') {
-                    const page = document.querySelector('.page.active')?.id?.replace('page-', '');
-                    if (page === 'dashboard') loadDashboard();
-                    if (page === 'vol') loadVol();
-                    if (page === 'signals') loadSignals();
-                }
-            }, 60000);
-        }
+async function loadNormReturns() {
+  const assets = ['NIFTY','BANKNIFTY','FINNIFTY','MIDCPNIFTY','SENSEX','BANKEX'];
+  const colors = {NIFTY:'#111',BANKNIFTY:'#cc2200',FINNIFTY:'#00aa44',MIDCPNIFTY:'#0066cc',SENSEX:'#886600',BANKEX:'#cc6600'};
+  const datasets = [];
+  for (const a of assets) {
+    try {
+      const exc = ['SENSEX','BANKEX'].includes(a)?'BSE':'NSE';
+      const d = await apiFetch(`/historical?symbol=${a}&exchange=${exc}&interval=1d&start=2025-01-01T03:45:00.000Z&fields=close`);
+      const closes = d.result?.[0]?.values?.[0]?.[a]?.close||[];
+      if (!closes.length) continue;
+      const base = closes[0].v||closes[0].value;
+      datasets.push({label:a, data:closes.map(p=>(((p.v||p.value)/base)*100).toFixed(2)),
+        borderColor:colors[a], borderWidth:1.5, pointRadius:0, fill:false});
+    } catch(e){}
+  }
+  if (!datasets.length) return;
+  const ctx = document.getElementById('norm-chart')?.getContext('2d');
+  if (!ctx) return;
+  if (charts.norm) charts.norm.destroy();
+  charts.norm = new Chart(ctx, {
+    type:'line',
+    data:{labels:Array.from({length:Math.max(...datasets.map(d=>d.data.length))},(_,i)=>i+1), datasets},
+    options:{animation:false, plugins:{legend:{labels:{color:'#888',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#888',maxTicksLimit:10,font:{size:10}},grid:{color:'#f5f5f5'}},
+              y:{ticks:{color:'#888',font:{size:10}},grid:{color:'#f5f5f5'}}}}
+  });
+}
 
-        // ── Init ──────────────────────────────────────────────────────────────────────
-        async function init() {
-            // Wake up server first, then load dashboard
-            const b = document.getElementById('mkt-badge');
-            const s = document.getElementById('hstatus');
-            b.textContent = '○ Waking server…';
-            s.textContent = 'Connecting (may take 30s on first load)…';
+const fetchHistorical = loadHistory;
 
-            try {
-                await checkHealth();
-                connectWS();
-                loadDashboard();
-                startAutoRefresh();
-            } catch (e) {
-                // Server still waking — retry in 5s
-                setTimeout(init, 5000);
-            }
-        }
+// ── Auto-refresh ──────────────────────────────────────────────────────────────
+setInterval(()=>{
+  if (mktStatus==='open') {
+    const page = document.querySelector('.page.active')?.id?.replace('page-','');
+    if (page==='overview') loadOverview();
+    if (page==='signals')  loadSignals();
+  }
+}, 60000);
 
-        init();
-    </script>
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  await checkHealth();
+  connectWS();
+  loadOverview();
+}
+init();
+</script>
 </body>
-
 </html>
