@@ -273,6 +273,10 @@ async def lifespan(_app: FastAPI):
         threading.Thread(target=_load, daemon=True).start()
         threading.Thread(target=_scheduler, daemon=True).start()
         threading.Thread(target=_keep_alive, daemon=True).start()
+
+        # Auto-refresh token every 10h using TOTP (no SMS needed)
+        from token_refresh import start_token_refresh_loop
+        start_token_refresh_loop(state, interval_hours=10.0)
     else:
         logger.warning(
             "[server] No auth — set NUBRA_SESSION_TOKEN + NUBRA_DEVICE_ID on Render"
