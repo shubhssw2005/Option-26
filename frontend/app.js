@@ -1,9 +1,10 @@
-'use strict'; // v2
+'use strict';
 
 // ── API base ──────────────────────────────────────────────────────────────────
+const RENDER_URL = 'https://option-26.onrender.com';
 const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:8000'
-  : window.location.origin;
+  : RENDER_URL;
 
 const TIMEOUT = 60000;
 let charts = {}, mktStatus = 'unknown';
